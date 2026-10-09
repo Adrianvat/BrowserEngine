@@ -34,7 +34,9 @@ src/engine/render/canvas.ts    Canvas resource (wraps 2D context)
 src/engine/render/components.ts Transform, Rect
 src/engine/render/systems.ts   built-in rect render system
 src/engine/index.ts            public exports
-src/game/main.ts               demo game
+src/game/components.ts         demo game components
+src/game/systems.ts            demo game systems
+src/game/main.ts               demo game entry point (spawns entities, starts Game)
 tests/                         Vitest unit tests
 ```
 
@@ -72,6 +74,7 @@ game.stop();
 
 - `canvas` option accepts a CSS selector or an `HTMLCanvasElement`; throws if not found. Sets canvas width/height.
 - `Game` creates a `World` (exposed as `game.world`) and registers resources `Keyboard` and `Canvas`.
+- `start()` while running and `stop()` while stopped are no-ops. Calling `stop()` from inside a system ends the loop after the current frame.
 - The built-in rect render system is registered automatically as the first render system.
 - Systems run in registration order. Update systems receive the fixed step `dt` (1/60 s); render systems receive the real frame delta.
 - **Fixed timestep** (`timestep.ts`, pure and testable): each frame, elapsed time is clamped to 250 ms and added to an accumulator; while accumulator ≥ step, one update step runs and the step is subtracted. Function returns the number of update steps to run and the new accumulator.
@@ -79,11 +82,11 @@ game.stop();
 
 ## Input (`Keyboard` resource)
 
-- Listens to `keydown`/`keyup` on `window`, using `KeyboardEvent.code` (layout-independent).
+- Listens to `keydown`/`keyup`/`blur` on an `EventTarget` (the `window` in the game), using `KeyboardEvent.code` (layout-independent).
 - `isDown(code): boolean` — currently held.
-- `wasPressed(code): boolean` — went down since the last update step; cleared by `endStep()`.
+- `wasPressed(code): boolean` — went down since the last update step; cleared by `endStep()`. OS key auto-repeat does not re-trigger it.
 - Clears all state on window `blur` to avoid stuck keys.
-- `dispose()` removes listeners (called by `game.stop()`).
+- `attach(target)` adds listeners (called by `game.start()`); `detach()` removes them and clears state (called by `game.stop()`), so a game can be stopped and restarted.
 - Event handling is separated from the DOM (`handleKeyDown(code)`, `handleKeyUp(code)`) so it can be unit-tested without a browser.
 
 ## Rendering
@@ -110,6 +113,7 @@ game.stop();
   - `World`: spawn IDs unique/increasing; add/get/has/remove; replacing a component; despawn removes all components; `add` on dead entity throws; query returns only entities with all requested components; query result typing (compile-time); despawning during iteration of query results is safe; resources set/get/missing throws.
   - `Keyboard`: `isDown` vs `wasPressed`; `endStep` clears pressed but not held; blur clears all.
   - `timestep`: step counting, accumulator carry-over, 250 ms clamp.
+  - Demo systems: `playerInput` and `movement`.
 - Rendering and the loop's DOM wiring are verified manually by running the demo.
 
 ## Out of scope (future milestones)
