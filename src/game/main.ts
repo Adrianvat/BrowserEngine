@@ -1,5 +1,6 @@
-import { Game, Layer, Rect, Sprite, Transform } from "../engine";
+import { Canvas, Game, Layer, Rect, Sprite, Transform } from "../engine";
 import { Player, Velocity } from "./components";
+import { drawError } from "./errors";
 import { bounce, clampPlayer, movement, playerAppearance, playerInput } from "./systems";
 
 const WIDTH = 800;
@@ -9,10 +10,15 @@ const PLAYER_SIZE = 32;
 const game = new Game({ canvas: "#game", width: WIDTH, height: HEIGHT, pixelArt: true });
 const world = game.world;
 
-await game.assets.loadImages({
-  background: "/background.svg",
-  hero: { url: "/hero.svg", frameWidth: 16, frameHeight: 16 },
-});
+try {
+  await game.assets.loadImages({
+    background: "/background.svg",
+    hero: { url: "/hero.svg", frameWidth: 16, frameHeight: 16 },
+  });
+} catch (error) {
+  drawError(world.getResource(Canvas), error);
+  throw error;
+}
 
 const background = world.spawn();
 world.add(background, new Transform(0, 0));

@@ -1,4 +1,6 @@
-/** Loads one image file. The default uses the browser's Image element. */
+import { loadBrowserImage } from "./browser-loader";
+
+/** Loads one image file. The default downloads and decodes it in the browser. */
 export type ImageLoader = (url: string) => Promise<HTMLImageElement>;
 
 /** An image split into a grid of equal-size frames. */
@@ -25,13 +27,6 @@ interface LoadedImage {
   frameHeight: number;
   columns: number;
   count: number;
-}
-
-export async function loadBrowserImage(url: string): Promise<HTMLImageElement> {
-  const image = new Image();
-  image.src = url;
-  await image.decode();
-  return image;
 }
 
 function isPositiveInteger(value: number): boolean {
@@ -103,7 +98,8 @@ export class Assets {
     try {
       image = await this.loader(url);
     } catch (cause) {
-      throw new Error(`Failed to load image "${name}" from ${url}`, { cause });
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      throw new Error(`Failed to load image "${name}" from ${url}: ${reason}`, { cause });
     }
     const { width, height } = image;
 

@@ -47,13 +47,13 @@ class Assets {
 }
 ```
 
-- `loadImages` loads all sources in parallel. **All-or-nothing:** if any fails, none of that batch is registered and the promise rejects with `Failed to load image "<name>" from <url>`. Loading a name that already exists replaces it.
+- `loadImages` loads all sources in parallel. **All-or-nothing:** if any fails, none of that batch is registered and the promise rejects with `Failed to load image "<name>" from <url>: <reason>` (the loader's error is also kept as `cause`). Loading a name that already exists replaces it.
 - Image size is read from `image.width` / `image.height`.
 - Sheet validation (at load time, rejects the batch): `frameWidth` and `frameHeight` must be positive integers, else `Invalid frame size for image "<name>"`; the image must contain at least one whole frame, else `Image "<name>" (<w>x<h>) is smaller than one <fw>x<fh> frame`. Partial frames at the right/bottom edge are ignored.
-- A single image has exactly one frame: the whole image. A single image whose width or height is 0 (e.g. an SVG without `width`/`height` attributes) rejects the batch with `Image "<name>" has no size (<w>x<h>)`.
+- A single image has exactly one frame: the whole image. A single image whose width or height is 0 rejects the batch with `Image "<name>" has no size (<w>x<h>)`.
 - Frames are numbered from 0, left to right, then top to bottom: with `cols = floor(w / fw)`, frame `i` is at `sx = (i % cols) * fw`, `sy = floor(i / cols) * fh`.
-- `getImage`, `frameCount`, `getFrame` throw `Image "<name>" is not loaded` for unknown names. `getFrame` throws `Frame <i> is out of range for "<name>" (<n> frames)` for non-integer, negative, or too-large indices.
-- Default loader: `new Image()`, set `src`, `await image.decode()`.
+- `getImage`, `frameCount`, `getFrame` throw `Image "<name>" is not loaded` for unknown names. `getFrame` throws `Frame <i> is out of range for "<name>" (<n> frames)` (`(1 frame)` for a single image) for non-integer, negative, or too-large indices.
+- Default loader (`src/engine/assets/browser-loader.ts`): `fetch` the URL; reject with `HTTP <status> <text>` if not OK, and with `Expected an image but got <content-type>` if the response isn't `image/*` (Vite answers unknown paths with its HTML page). For `image/svg+xml`, the root `<svg>` must have positive `width` and `height` in pixels, else reject with `SVG has no width/height in pixels; add width and height attributes to its root <svg>` — browsers give a size-less SVG a made-up size (Chrome: 300×150), which would silently break frame math. Then decode the downloaded blob through `new Image()` + `decode()`.
 - Image files live in `public/` and are referenced by root URLs (`/hero.png`).
 
 ## Components
@@ -95,7 +95,7 @@ Flipping mirrors the sprite in place (its top-left corner stays at `Transform`):
 - `public/hero.svg`: a 32×16 sheet of two 16×16 frames (0 = standing, 1 = moving). Player is `Sprite("hero", { width: 32, height: 32 })` on `Layer(1)`, replacing its `Rect`.
 - New demo system `playerAppearance`: frame 1 while the player's velocity is non-zero, else 0; `flipX = true` when moving left, `false` when moving right, unchanged when not moving horizontally.
 - `bounce` is split: rect bouncing stays as is (non-player entities with `Rect`); a new `clampPlayer` system keeps the player inside the canvas using its sprite's `width`/`height`.
-- `main.ts` awaits `game.assets.loadImages(...)` before `game.start()`, and enables `pixelArt`.
+- `main.ts` awaits `game.assets.loadImages(...)` before `game.start()`, and enables `pixelArt`. If loading fails, `drawError` (`src/game/errors.ts`) writes the error message on the canvas instead of leaving it blank, and the error is re-thrown.
 - SVG files have explicit `width`/`height` attributes so their natural size is defined.
 
 ## Error handling

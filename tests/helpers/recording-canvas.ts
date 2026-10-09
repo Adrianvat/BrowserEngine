@@ -5,6 +5,7 @@ export type Call = [string, ...unknown[]];
 /** Stands in for CanvasRenderingContext2D and records every drawing call. */
 class RecordingContext {
   fillStyle = "";
+  font = "";
   imageSmoothingEnabled = true;
   readonly calls: Call[] = [];
 
@@ -13,6 +14,9 @@ class RecordingContext {
   }
   fillRect(...args: unknown[]): void {
     this.calls.push(["fillRect", this.fillStyle, ...args]);
+  }
+  fillText(...args: unknown[]): void {
+    this.calls.push(["fillText", ...args]);
   }
   drawImage(...args: unknown[]): void {
     this.calls.push(["drawImage", ...args]);

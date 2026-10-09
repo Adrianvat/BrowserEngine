@@ -56,6 +56,13 @@ describe("Assets.loadImages", () => {
     );
   });
 
+  it("includes the loader's reason in the error", async () => {
+    const assets = new Assets(fakeLoader({}));
+    await expect(assets.loadImages({ hero: "/hero.png" })).rejects.toThrow(
+      'Failed to load image "hero" from /hero.png: 404 /hero.png',
+    );
+  });
+
   it("is all-or-nothing: one failure registers none of the batch, earlier loads survive", async () => {
     const assets = new Assets(fakeLoader({ "/old.png": fakeImage(8, 8), "/ok.png": fakeImage(8, 8) }));
     await assets.loadImages({ old: "/old.png" });
