@@ -60,7 +60,10 @@ export class Game {
   }
 
   private readonly frame = (now: number): void => {
-    const elapsed = (now - this.lastTime) / 1000;
+    // Cleared so we can tell whether a system restarted the loop during this frame.
+    this.frameId = 0;
+    // The first frame's timestamp can be slightly earlier than start()'s performance.now().
+    const elapsed = Math.max(0, (now - this.lastTime) / 1000);
     this.lastTime = now;
 
     const { steps, accumulator } = advance(this.accumulator, elapsed);
@@ -71,7 +74,7 @@ export class Game {
     }
     for (const system of this.renderSystems) system(this.world, elapsed);
 
-    // A system may have called stop() during this frame.
-    if (this.running) this.frameId = requestAnimationFrame(this.frame);
+    // A system may have called stop() (and maybe start(), which already scheduled a frame).
+    if (this.running && this.frameId === 0) this.frameId = requestAnimationFrame(this.frame);
   };
 }
