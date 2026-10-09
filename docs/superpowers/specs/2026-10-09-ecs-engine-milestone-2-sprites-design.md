@@ -50,7 +50,7 @@ class Assets {
 - `loadImages` loads all sources in parallel. **All-or-nothing:** if any fails, none of that batch is registered and the promise rejects with `Failed to load image "<name>" from <url>`. Loading a name that already exists replaces it.
 - Image size is read from `image.width` / `image.height`.
 - Sheet validation (at load time, rejects the batch): `frameWidth` and `frameHeight` must be positive integers, else `Invalid frame size for image "<name>"`; the image must contain at least one whole frame, else `Image "<name>" (<w>x<h>) is smaller than one <fw>x<fh> frame`. Partial frames at the right/bottom edge are ignored.
-- A single image has exactly one frame: the whole image.
+- A single image has exactly one frame: the whole image. A single image whose width or height is 0 (e.g. an SVG without `width`/`height` attributes) rejects the batch with `Image "<name>" has no size (<w>x<h>)`.
 - Frames are numbered from 0, left to right, then top to bottom: with `cols = floor(w / fw)`, frame `i` is at `sx = (i % cols) * fw`, `sy = floor(i / cols) * fh`.
 - `getImage`, `frameCount`, `getFrame` throw `Image "<name>" is not loaded` for unknown names. `getFrame` throws `Frame <i> is out of range for "<name>" (<n> frames)` for non-integer, negative, or too-large indices.
 - Default loader: `new Image()`, set `src`, `await image.decode()`.
