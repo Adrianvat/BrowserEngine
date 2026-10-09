@@ -165,3 +165,35 @@ describe("World.query", () => {
     expect(world.query(Position)).toHaveLength(2);
   });
 });
+
+class Score {
+  constructor(public value = 0) {}
+}
+
+describe("World resources", () => {
+  it("setResource / getResource return the same, correctly typed instance", () => {
+    const world = new World();
+    const score = new Score(10);
+    world.setResource(score);
+    const got = world.getResource(Score);
+    expectTypeOf(got).toEqualTypeOf<Score>();
+    expect(got).toBe(score);
+    expect(world.hasResource(Score)).toBe(true);
+  });
+
+  it("setResource replaces an existing resource of the same type", () => {
+    const world = new World();
+    world.setResource(new Score(1));
+    const second = new Score(2);
+    world.setResource(second);
+    expect(world.getResource(Score)).toBe(second);
+  });
+
+  it("getResource throws a descriptive error when missing", () => {
+    const world = new World();
+    expect(world.hasResource(Score)).toBe(false);
+    expect(() => world.getResource(Score)).toThrow(
+      "Resource Score not found. Did you call world.setResource(new Score(...))?",
+    );
+  });
+});

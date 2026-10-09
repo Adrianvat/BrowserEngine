@@ -10,11 +10,16 @@ type InstancesOf<T extends ComponentType[]> = {
   [K in keyof T]: T[K] extends ComponentType<infer I> ? I : never;
 };
 
+/** Game logic. Update systems get the fixed step; render systems get the frame time. */
+export type System = (world: World, dt: number) => void;
+
 export class World {
   private nextId = 1;
   private readonly alive = new Set<Entity>();
   /** One store per component class: entity -> component instance. */
   private readonly stores = new Map<ComponentType, Map<Entity, unknown>>();
+  /** Global singletons not tied to an entity (input, canvas, score...). */
+  private readonly resources = new Map<ComponentType, unknown>();
 
   spawn(): Entity {
     const entity = this.nextId++;
@@ -88,5 +93,22 @@ export class World {
       results.push(row);
     }
     return results as [Entity, ...InstancesOf<T>][];
+  }
+
+  setResource<T extends object>(resource: T): void {
+    this.resources.set(resource.constructor as ComponentType, resource);
+  }
+
+  getResource<T>(type: ComponentType<T>): T {
+    if (!this.resources.has(type)) {
+      throw new Error(
+        `Resource ${type.name} not found. Did you call world.setResource(new ${type.name}(...))?`,
+      );
+    }
+    return this.resources.get(type) as T;
+  }
+
+  hasResource(type: ComponentType): boolean {
+    return this.resources.has(type);
   }
 }
