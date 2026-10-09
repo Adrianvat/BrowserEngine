@@ -1,7 +1,7 @@
 import { World, type System } from "../ecs/world";
 import { Keyboard } from "../input/keyboard";
 import { Canvas } from "../render/canvas";
-import { renderRects } from "../render/systems";
+import { render } from "../render/systems";
 import { advance, FIXED_STEP } from "./timestep";
 
 export interface GameOptions {
@@ -14,7 +14,7 @@ export interface GameOptions {
 export class Game {
   readonly world = new World();
   private readonly updateSystems: System[] = [];
-  private readonly renderSystems: System[] = [renderRects];
+  private readonly renderSystems: System[] = [render];
   private readonly keyboard = new Keyboard();
   private running = false;
   private frameId = 0;
@@ -38,7 +38,7 @@ export class Game {
     this.updateSystems.push(system);
   }
 
-  /** Adds a system that runs once per browser frame, after the built-in rect renderer. */
+  /** Adds a system that runs once per browser frame, after the built-in renderer. */
   addRenderSystem(system: System): void {
     this.renderSystems.push(system);
   }
