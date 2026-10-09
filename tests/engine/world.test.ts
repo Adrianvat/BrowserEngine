@@ -1,11 +1,15 @@
-import { describe, it, expect } from "vitest";
-import { World } from "../../src/engine/ecs/world";
+import { describe, it, expect, expectTypeOf } from "vitest";
+import { World, type Entity } from "../../src/engine/ecs/world";
 
 class Position {
   constructor(public x = 0, public y = 0) {}
 }
 class Velocity {
   constructor(public x = 0, public y = 0) {}
+}
+class Tag {}
+class Name {
+  constructor(public value = "") {}
 }
 
 describe("World entities", () => {
@@ -86,5 +90,78 @@ describe("World components", () => {
     expect(() => world.add(e, new Position())).toThrow(
       `Cannot add Position to entity ${e}: entity is not alive`,
     );
+  });
+});
+
+describe("World.query", () => {
+  it("returns only entities that have every requested component, in argument order", () => {
+    const world = new World();
+    const moving = world.spawn();
+    const pos = new Position(1, 2);
+    const vel = new Velocity(3, 4);
+    world.add(moving, pos);
+    world.add(moving, vel);
+    const still = world.spawn();
+    world.add(still, new Position());
+
+    expect(world.query(Position, Velocity)).toEqual([[moving, pos, vel]]);
+    const [row] = world.query(Velocity, Position);
+    expect(row[1]).toBe(vel);
+    expect(row[2]).toBe(pos);
+    expect(world.query(Position).map(([e]) => e)).toEqual([moving, still]);
+  });
+
+  it("is fully typed", () => {
+    // Name differs in shape from Position: TypeScript types are structural,
+    // so two classes with identical fields would be indistinguishable here.
+    const world = new World();
+    expectTypeOf(world.query(Position, Name)).toEqualTypeOf<[Entity, Position, Name][]>();
+    expectTypeOf(world.query(Name, Position)).toEqualTypeOf<[Entity, Name, Position][]>();
+    expectTypeOf(world.query(Tag)).toEqualTypeOf<[Entity, Tag][]>();
+  });
+
+  it("works with field-less tag components", () => {
+    const world = new World();
+    const e = world.spawn();
+    world.add(e, new Tag());
+    expect(world.query(Tag).map(([id]) => id)).toEqual([e]);
+  });
+
+  it("returns an empty array for a component type that was never added", () => {
+    const world = new World();
+    const e = world.spawn();
+    world.add(e, new Position());
+    expect(world.query(Position, Velocity)).toEqual([]);
+  });
+
+  it("throws when called with no component types", () => {
+    const world = new World();
+    expect(() => world.query()).toThrow("query() requires at least one component type");
+  });
+
+  it("despawning during iteration is safe", () => {
+    const world = new World();
+    const ids = [world.spawn(), world.spawn(), world.spawn()];
+    for (const id of ids) world.add(id, new Position());
+
+    const visited: Entity[] = [];
+    for (const [e] of world.query(Position)) {
+      visited.push(e);
+      world.despawn(e);
+    }
+    expect(visited).toEqual(ids);
+    expect(world.query(Position)).toEqual([]);
+  });
+
+  it("entities added during iteration are not part of the current results", () => {
+    const world = new World();
+    world.add(world.spawn(), new Position());
+    let count = 0;
+    world.query(Position).forEach(() => {
+      count++;
+      world.add(world.spawn(), new Position());
+    });
+    expect(count).toBe(1);
+    expect(world.query(Position)).toHaveLength(2);
   });
 });

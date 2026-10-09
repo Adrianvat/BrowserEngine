@@ -5,6 +5,11 @@ export type Entity = number;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ComponentType<T = unknown> = new (...args: any[]) => T;
 
+/** Maps a tuple of component classes to a tuple of their instances. */
+type InstancesOf<T extends ComponentType[]> = {
+  [K in keyof T]: T[K] extends ComponentType<infer I> ? I : never;
+};
+
 export class World {
   private nextId = 1;
   private readonly alive = new Set<Entity>();
@@ -49,5 +54,39 @@ export class World {
 
   has(entity: Entity, type: ComponentType): boolean {
     return this.stores.get(type)?.has(entity) ?? false;
+  }
+
+  /**
+   * Returns [entity, ...components] for every entity that has all the given
+   * component types. The result is a fresh array, so it is safe to spawn,
+   * despawn, add or remove while looping over it.
+   */
+  query<T extends ComponentType[]>(...types: T): [Entity, ...InstancesOf<T>][] {
+    if (types.length === 0) {
+      throw new Error("query() requires at least one component type");
+    }
+    const stores: Map<Entity, unknown>[] = [];
+    for (const type of types) {
+      const store = this.stores.get(type);
+      if (!store) return [];
+      stores.push(store);
+    }
+
+    // Loop over the smallest store; only those entities can match.
+    let smallest = stores[0];
+    for (const store of stores) {
+      if (store.size < smallest.size) smallest = store;
+    }
+
+    const results: unknown[][] = [];
+    candidates: for (const entity of smallest.keys()) {
+      const row: unknown[] = [entity];
+      for (const store of stores) {
+        if (!store.has(entity)) continue candidates;
+        row.push(store.get(entity));
+      }
+      results.push(row);
+    }
+    return results as [Entity, ...InstancesOf<T>][];
   }
 }
