@@ -1,3 +1,4 @@
+import { Assets } from "../assets/assets";
 import { World, type System } from "../ecs/world";
 import { Keyboard } from "../input/keyboard";
 import { Canvas } from "../render/canvas";
@@ -9,10 +10,13 @@ export interface GameOptions {
   canvas: string | HTMLCanvasElement;
   width: number;
   height: number;
+  /** Turn off image smoothing so scaled-up pixel art stays sharp. */
+  pixelArt?: boolean;
 }
 
 export class Game {
   readonly world = new World();
+  readonly assets = new Assets();
   private readonly updateSystems: System[] = [];
   private readonly renderSystems: System[] = [render];
   private readonly keyboard = new Keyboard();
@@ -29,7 +33,10 @@ export class Game {
     if (!(element instanceof HTMLCanvasElement)) {
       throw new Error(`Canvas element not found: ${String(options.canvas)}`);
     }
-    this.world.setResource(new Canvas(element, options.width, options.height));
+    const canvas = new Canvas(element, options.width, options.height);
+    canvas.ctx.imageSmoothingEnabled = !options.pixelArt;
+    this.world.setResource(canvas);
+    this.world.setResource(this.assets);
     this.world.setResource(this.keyboard);
   }
 

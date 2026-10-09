@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../../src/engine/core/game";
 import { FIXED_STEP } from "../../src/engine/core/timestep";
 import { Keyboard } from "../../src/engine/input/keyboard";
+import { Assets } from "../../src/engine/assets/assets";
+import { Canvas } from "../../src/engine/render/canvas";
 
 // Just enough of the browser for Game to run in Node.
 class FakeCanvasElement {
@@ -115,5 +117,24 @@ describe("Game loop", () => {
     tick(20);
     tick(20);
     expect(seen).toEqual([true, false]);
+  });
+});
+
+describe("Game setup", () => {
+  it("exposes the Assets resource as game.assets", () => {
+    const game = makeGame();
+    expect(game.assets).toBeInstanceOf(Assets);
+    expect(game.world.getResource(Assets)).toBe(game.assets);
+  });
+
+  it("keeps image smoothing on by default", () => {
+    const game = makeGame();
+    expect(game.world.getResource(Canvas).ctx.imageSmoothingEnabled).toBe(true);
+  });
+
+  it("pixelArt turns image smoothing off", () => {
+    const canvas = new FakeCanvasElement() as unknown as HTMLCanvasElement;
+    const game = new Game({ canvas, width: 100, height: 100, pixelArt: true });
+    expect(game.world.getResource(Canvas).ctx.imageSmoothingEnabled).toBe(false);
   });
 });
