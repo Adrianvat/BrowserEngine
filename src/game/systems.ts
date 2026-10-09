@@ -1,7 +1,11 @@
-import { Canvas, Keyboard, Rect, Transform, type World } from "../engine";
+import { Assets, Canvas, Keyboard, Rect, Sprite, Transform, type World } from "../engine";
 import { Player, Velocity } from "./components";
 
 export const PLAYER_SPEED = 300;
+
+/** Frames in hero.svg. */
+const STANDING_FRAME = 0;
+const MOVING_FRAME = 1;
 
 export function playerInput(world: World): void {
   const keyboard = world.getResource(Keyboard);
@@ -24,19 +28,12 @@ export function movement(world: World, dt: number): void {
   }
 }
 
-/** Keeps everything on screen: the player stops at the edges, others bounce. */
+/** Bounces moving rects off the canvas edges. */
 export function bounce(world: World): void {
   const { width, height } = world.getResource(Canvas);
-  for (const [entity, transform, rect, velocity] of world.query(Transform, Rect, Velocity)) {
+  for (const [, transform, rect, velocity] of world.query(Transform, Rect, Velocity)) {
     const maxX = width - rect.width;
     const maxY = height - rect.height;
-
-    if (world.has(entity, Player)) {
-      transform.x = Math.min(Math.max(transform.x, 0), maxX);
-      transform.y = Math.min(Math.max(transform.y, 0), maxY);
-      continue;
-    }
-
     if (transform.x < 0) {
       transform.x = 0;
       velocity.x = Math.abs(velocity.x);
@@ -51,5 +48,28 @@ export function bounce(world: World): void {
       transform.y = maxY;
       velocity.y = -Math.abs(velocity.y);
     }
+  }
+}
+
+/** Keeps the player inside the canvas, using its sprite's drawn size. */
+export function clampPlayer(world: World): void {
+  const { width, height } = world.getResource(Canvas);
+  const assets = world.getResource(Assets);
+  for (const [, , transform, sprite] of world.query(Player, Transform, Sprite)) {
+    const frame = assets.getFrame(sprite.image, sprite.frame);
+    const maxX = width - (sprite.width ?? frame.sw);
+    const maxY = height - (sprite.height ?? frame.sh);
+    transform.x = Math.min(Math.max(transform.x, 0), maxX);
+    transform.y = Math.min(Math.max(transform.y, 0), maxY);
+  }
+}
+
+/** Picks the player's frame and facing from its velocity. */
+export function playerAppearance(world: World): void {
+  for (const [, , velocity, sprite] of world.query(Player, Velocity, Sprite)) {
+    const moving = velocity.x !== 0 || velocity.y !== 0;
+    sprite.frame = moving ? MOVING_FRAME : STANDING_FRAME;
+    if (velocity.x < 0) sprite.flipX = true;
+    else if (velocity.x > 0) sprite.flipX = false;
   }
 }

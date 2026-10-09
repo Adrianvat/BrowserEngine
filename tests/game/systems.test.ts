@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { Keyboard, Transform, World } from "../../src/engine";
+import { Assets, Keyboard, Sprite, Transform, World } from "../../src/engine";
 import { Player, Velocity } from "../../src/game/components";
-import { movement, playerInput, PLAYER_SPEED } from "../../src/game/systems";
+import {
+  clampPlayer,
+  movement,
+  playerAppearance,
+  playerInput,
+  PLAYER_SPEED,
+} from "../../src/game/systems";
+import { recordingCanvas } from "../helpers/recording-canvas";
 
 describe("movement", () => {
   it("moves Transform by Velocity * dt", () => {
@@ -45,5 +52,75 @@ describe("playerInput", () => {
     playerInput(world);
     expect(world.get(player, Velocity)).toEqual(new Velocity(0, 0));
     expect(world.get(other, Velocity)).toEqual(new Velocity(1, 1));
+  });
+});
+
+describe("playerAppearance", () => {
+  function setup() {
+    const world = new World();
+    const player = world.spawn();
+    const velocity = new Velocity();
+    const sprite = new Sprite("hero");
+    world.add(player, new Player());
+    world.add(player, velocity);
+    world.add(player, sprite);
+    return { world, velocity, sprite };
+  }
+
+  it("shows the moving frame while moving and the standing frame when still", () => {
+    const { world, velocity, sprite } = setup();
+    velocity.y = 10;
+    playerAppearance(world);
+    expect(sprite.frame).toBe(1);
+    velocity.y = 0;
+    playerAppearance(world);
+    expect(sprite.frame).toBe(0);
+  });
+
+  it("faces the way it moves horizontally and keeps facing otherwise", () => {
+    const { world, velocity, sprite } = setup();
+    velocity.x = -10;
+    playerAppearance(world);
+    expect(sprite.flipX).toBe(true);
+
+    velocity.x = 0;
+    playerAppearance(world);
+    expect(sprite.flipX).toBe(true);
+
+    velocity.y = 10;
+    playerAppearance(world);
+    expect(sprite.flipX).toBe(true);
+
+    velocity.x = 10;
+    playerAppearance(world);
+    expect(sprite.flipX).toBe(false);
+  });
+});
+
+describe("clampPlayer", () => {
+  async function setup(sprite: Sprite, x: number, y: number) {
+    const world = new World();
+    world.setResource(recordingCanvas(100, 100).canvas);
+    const assets = new Assets(async () => ({ width: 32, height: 16 }) as HTMLImageElement);
+    await assets.loadImages({ hero: { url: "/hero.svg", frameWidth: 16, frameHeight: 16 } });
+    world.setResource(assets);
+    const player = world.spawn();
+    const transform = new Transform(x, y);
+    world.add(player, new Player());
+    world.add(player, transform);
+    world.add(player, sprite);
+    return { world, transform };
+  }
+
+  it("keeps the player inside the canvas using the sprite's explicit size", async () => {
+    const { world, transform } = await setup(new Sprite("hero", { width: 32, height: 32 }), 90, -5);
+    clampPlayer(world);
+    expect([transform.x, transform.y]).toEqual([68, 0]);
+  });
+
+  it("uses the frame's own size when the sprite has no explicit size", async () => {
+    const { world, transform } = await setup(new Sprite("hero"), 95, 95);
+    clampPlayer(world);
+    expect([transform.x, transform.y]).toEqual([84, 84]);
   });
 });
