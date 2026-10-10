@@ -16,7 +16,8 @@ export function animate(world: World, dt: number): void {
     const clip = assets.getAnimation(sprite.image, animator.clip);
     const count = clip.frames.length;
     animator.time += dt;
-    let position = Math.floor(animator.time * clip.fps + EPSILON);
+    // A negative time (a delayed start) holds the first frame.
+    let position = Math.max(0, Math.floor(animator.time * clip.fps + EPSILON));
 
     if (clip.loop) {
       const cycles = Math.floor(position / count);

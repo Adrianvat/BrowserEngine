@@ -111,6 +111,13 @@ describe("animate", () => {
     expect(animator.finished).toBe(true);
   });
 
+  it("shows the first frame while time is still negative (a delayed start)", async () => {
+    const { animator, run } = await setup();
+    animator.time = -0.5;
+    expect(run(2, 0.125)).toEqual([2, 2]);
+    expect(animator.time).toBeCloseTo(-0.25);
+  });
+
   it("lands exactly on frame boundaries at the 60 Hz step", async () => {
     const { animator, run } = await setup();
     animator.play("tenth");
