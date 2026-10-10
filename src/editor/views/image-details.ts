@@ -96,14 +96,16 @@ export function mountImageDetails(
   const clipRow = (image: string, clip: string, readOnly: boolean) => {
     const row = document.createElement("div");
     row.className = "clip";
+    // Kept current by refresh(), since a rename doesn't rebuild the row.
     row.dataset.clip = clip;
+    const currentClip = () => row.dataset.clip ?? clip;
     const update = (input: HTMLInputElement, changes: () => ClipChanges | Error) => {
       input.addEventListener("change", () => {
         const next = changes();
         if (next instanceof Error) {
           attempt(input, () => Promise.reject(next));
         } else {
-          attempt(input, () => library.updateClip(image, clip, next));
+          attempt(input, () => library.updateClip(image, currentClip(), next));
         }
       });
     };
@@ -134,8 +136,10 @@ export function mountImageDetails(
     if (!readOnly) {
       const remove = document.createElement("button");
       remove.textContent = "×";
-      remove.title = `Remove ${clip}`;
-      remove.addEventListener("click", () => attempt(null, () => library.removeClip(image, clip)));
+      remove.title = "Remove clip";
+      remove.addEventListener("click", () =>
+        attempt(null, () => library.removeClip(image, currentClip())),
+      );
       row.append(remove);
     }
     return row;
@@ -190,14 +194,17 @@ export function mountImageDetails(
       scope.querySelector<HTMLInputElement>(`[data-field="${name}"]`);
     set(field(root, "frameWidth"), info.sheet ? String(info.sheet.frameWidth) : "");
     set(field(root, "frameHeight"), info.sheet ? String(info.sheet.frameHeight) : "");
-    for (const row of root.querySelectorAll<HTMLElement>(".clip")) {
-      const clip = info.sheet?.animations[row.dataset.clip ?? ""];
-      if (!clip) continue;
-      set(field(row, "name"), row.dataset.clip ?? "");
+    const clipNames = Object.keys(info.sheet?.animations ?? {});
+    root.querySelectorAll<HTMLElement>(".clip").forEach((row, index) => {
+      const name = clipNames[index];
+      const clip = info.sheet?.animations[name];
+      if (name === undefined || !clip) return;
+      row.dataset.clip = name;
+      set(field(row, "name"), name);
       set(field(row, "frames"), formatFrames(clip.frames));
       set(field(row, "fps"), String(clip.fps));
       set(field(row, "loop"), clip.loop ?? true);
-    }
+    });
     const canvas = root.querySelector("canvas");
     if (canvas) drawPreview(canvas, info, assets);
   };
@@ -211,13 +218,7 @@ export function mountImageDetails(
       return;
     }
     const info = library.image(name);
-    const next = JSON.stringify([
-      name,
-      info.error,
-      info.sheet !== null,
-      Object.keys(info.sheet?.animations ?? {}),
-      confirming,
-    ]);
+    const next = detailsShape(info, confirming);
     if (next !== shape) {
       shape = next;
       build(info);
@@ -225,6 +226,20 @@ export function mountImageDetails(
     refresh(info);
   };
   return show;
+}
+
+/**
+ * What decides whether the panel is rebuilt. Clip names are left out on purpose:
+ * renaming a clip only refreshes its row, so the input the user tabbed to keeps focus.
+ */
+export function detailsShape(info: ImageInfo, confirming: boolean): string {
+  return JSON.stringify([
+    info.name,
+    info.error,
+    info.sheet !== null,
+    Object.keys(info.sheet?.animations ?? {}).length,
+    confirming,
+  ]);
 }
 
 function numberInput(field: string, readOnly: boolean): HTMLInputElement {
