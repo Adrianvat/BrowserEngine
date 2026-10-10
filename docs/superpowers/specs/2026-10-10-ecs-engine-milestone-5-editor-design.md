@@ -130,7 +130,8 @@ Errors (`<i>` is the entity's index in the array):
 - `Unsupported scene data version: <version>`
 - `Entity <i> must have a "name" string and a "components" object`
 - `Entity <i> ("<name>"): unknown component "<component>"`
-- `Entity <i> ("<name>"): <Component> has no field "<field>"`
+- `Entity <i> ("<name>"): <Component> must be an object of field values`
+- `Entity <i> ("<name>"): <Component> has no field "<field>"` (only the registered field names count, never inherited object keys such as `toString`)
 - `Entity <i> ("<name>"): <Component>.<field> must be <a number | a number or empty | a string | true or false | a color | an image name | one of left, center, right>`
 
 Notes on the type checks:
@@ -223,6 +224,7 @@ interface GameDefinition {
   - a canvas at the definition's width and height, drawn by the engine's `render` from a `World` built with `spawnSceneData`. It is rebuilt after every change, and no systems run.
   - The selected entity gets a 1px outline around its box, drawn after `render`.
   - An entity with a `Transform` but no `Rect`, `Sprite` or `Text` is drawn as a 9×9 cross marker centered on its Transform.
+  - If drawing fails (for example a sprite frame out of range), the viewport shows `Cannot draw this scene: <message>` instead, and the panels keep working so the field can be fixed.
 - **Inspector (right):** for the selected entity:
   - the name field;
   - one section per component, in data order, with an input per registered field:
