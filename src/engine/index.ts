@@ -11,6 +11,8 @@ export {
   validateSceneData,
 } from "./data/scene-data";
 export type { EntityData, SceneData } from "./data/scene-data";
+export { SceneStore, browserSceneStore } from "./data/scene-store";
+export type { SceneStorage } from "./data/scene-store";
 export { Game } from "./core/game";
 export type { GameOptions } from "./core/game";
 export { Scenes } from "./scene/scene";
