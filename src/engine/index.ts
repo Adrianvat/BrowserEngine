@@ -13,6 +13,14 @@ export {
 export type { EntityData, SceneData } from "./data/scene-data";
 export { SceneStore, browserSceneStore } from "./data/scene-store";
 export type { SceneStorage } from "./data/scene-store";
+export {
+  browserImageStore,
+  ImageStore,
+  imageSource,
+  toImageSources,
+  withoutBuiltInClashes,
+} from "./data/image-store";
+export type { ImageStorage, StoredImage, StoredSheet } from "./data/image-store";
 export { Game } from "./core/game";
 export type { GameOptions } from "./core/game";
 export type { GameDefinition, SceneEntry } from "./core/definition";
