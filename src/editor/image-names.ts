@@ -1,4 +1,4 @@
-/** `base` if it is free, otherwise the first free `base-2`, `base-3`… */
+/** `base` if it is free, otherwise the first free `base-2`, `base-3`â€¦ */
 export function uniqueName(base: string, taken: Iterable<string>): string {
   const used = new Set(taken);
   if (!used.has(base)) return base;

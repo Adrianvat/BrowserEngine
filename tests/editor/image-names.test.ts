@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { imageNameFromFile, uniqueName } from "../../src/editor/image-names";
 
 describe("uniqueName", () => {
-  it("adds -2, -3… until the name is free", () => {
+  it("adds -2, -3â€¦ until the name is free", () => {
     expect(uniqueName("clip", [])).toBe("clip");
     expect(uniqueName("clip", ["clip"])).toBe("clip-2");
     expect(uniqueName("clip", ["clip", "clip-2"])).toBe("clip-3");

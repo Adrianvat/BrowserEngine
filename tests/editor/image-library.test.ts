@@ -240,3 +240,200 @@ describe("ImageLibrary.remove", () => {
     expect(ctx.assets.hasImage("coin")).toBe(true);
   });
 });
+
+/** A loaded library with "slime", a 64x32 single image. */
+async function withSlime() {
+  const ctx = setup();
+  await ctx.library.load();
+  await ctx.library.add(ctx.file(64, 32), "slime.png");
+  return ctx;
+}
+
+describe("ImageLibrary.setFrameSize", () => {
+  it("makes a single image a sheet, and back", async () => {
+    const ctx = await withSlime();
+    await ctx.library.setFrameSize("slime", 16, 16);
+    expect(ctx.storage?.images.get("slime")?.sheet).toEqual({
+      frameWidth: 16,
+      frameHeight: 16,
+      animations: {},
+    });
+    expect(ctx.assets.frameCount("slime")).toBe(8);
+    expect(ctx.library.image("slime").sheet?.frameWidth).toBe(16);
+
+    await ctx.library.setFrameSize("slime", null, null);
+    expect(ctx.storage?.images.get("slime")?.sheet).toBeUndefined();
+    expect(ctx.assets.frameCount("slime")).toBe(1);
+  });
+
+  it("rejects only one of width and height", async () => {
+    const ctx = await withSlime();
+    await expect(ctx.library.setFrameSize("slime", 16, null)).rejects.toThrow(
+      "Set both frame width and height, or neither",
+    );
+    expect(ctx.storage?.images.get("slime")?.sheet).toBeUndefined();
+  });
+
+  it("rejects a frame larger than the image, leaving the store and Assets alone", async () => {
+    const ctx = await withSlime();
+    await ctx.library.setFrameSize("slime", 16, 16);
+    await expect(ctx.library.setFrameSize("slime", 64, 64)).rejects.toThrow(
+      'Image "slime" (64x32) is smaller than one 64x64 frame',
+    );
+    expect(ctx.storage?.images.get("slime")?.sheet?.frameWidth).toBe(16);
+    expect(ctx.assets.frameCount("slime")).toBe(8);
+  });
+
+  it("rejects a frame size that leaves a clip out of range", async () => {
+    const ctx = await withSlime();
+    await ctx.library.setFrameSize("slime", 16, 16);
+    await ctx.library.addClip("slime");
+    await ctx.library.updateClip("slime", "clip", { frames: [7] });
+    await expect(ctx.library.setFrameSize("slime", 32, 32)).rejects.toThrow(
+      'Animation "clip" of image "slime": frame 7 is out of range (2 frames)',
+    );
+    expect(ctx.assets.frameCount("slime")).toBe(8);
+  });
+
+  it("won't drop clips by making a sheet a single image", async () => {
+    const ctx = await withSlime();
+    await ctx.library.setFrameSize("slime", 16, 16);
+    await ctx.library.addClip("slime");
+    await expect(ctx.library.setFrameSize("slime", null, null)).rejects.toThrow(
+      "Remove the clips before making this a single image",
+    );
+    expect(ctx.storage?.images.get("slime")?.sheet?.animations).toHaveProperty("clip");
+  });
+});
+
+describe("ImageLibrary clips", () => {
+  async function withSheet() {
+    const ctx = await withSlime();
+    await ctx.library.setFrameSize("slime", 16, 16);
+    return ctx;
+  }
+
+  it("needs a frame size first", async () => {
+    const ctx = await withSlime();
+    await expect(ctx.library.addClip("slime")).rejects.toThrow(
+      "Set a frame size before adding clips",
+    );
+  });
+
+  it("adds clip, clip-2… playing frame 0 at 8 fps, looping", async () => {
+    const ctx = await withSheet();
+    expect(await ctx.library.addClip("slime")).toBe("clip");
+    expect(await ctx.library.addClip("slime")).toBe("clip-2");
+    expect(ctx.storage?.images.get("slime")?.sheet?.animations).toEqual({
+      clip: { frames: [0], fps: 8, loop: true },
+      "clip-2": { frames: [0], fps: 8, loop: true },
+    });
+    expect(ctx.assets.getAnimation("slime", "clip-2")).toEqual({ frames: [0], fps: 8, loop: true });
+  });
+
+  it("updates frames, fps and loop", async () => {
+    const ctx = await withSheet();
+    await ctx.library.addClip("slime");
+    await ctx.library.updateClip("slime", "clip", { frames: [1, 7], fps: 12, loop: false });
+    expect(ctx.assets.getAnimation("slime", "clip")).toEqual({ frames: [1, 7], fps: 12, loop: false });
+    expect(ctx.storage?.images.get("slime")?.sheet?.animations.clip).toEqual({
+      frames: [1, 7],
+      fps: 12,
+      loop: false,
+    });
+  });
+
+  it("renames a clip in place, keeping the order", async () => {
+    const ctx = await withSheet();
+    await ctx.library.addClip("slime");
+    await ctx.library.addClip("slime");
+    await ctx.library.updateClip("slime", "clip", { name: "walk" });
+    expect(Object.keys(ctx.library.image("slime").sheet?.animations ?? {})).toEqual([
+      "walk",
+      "clip-2",
+    ]);
+    expect(ctx.assets.hasAnimation("slime", "clip")).toBe(false);
+    expect(ctx.assets.hasAnimation("slime", "walk")).toBe(true);
+  });
+
+  it.each([
+    [{ frames: [8] }, 'Animation "clip" of image "slime": frame 8 is out of range (8 frames)'],
+    [{ frames: [] }, 'Animation "clip" of image "slime" has no frames'],
+    [{ fps: 0 }, 'Animation "clip" of image "slime" has invalid fps (0)'],
+    [{ fps: NaN }, 'Animation "clip" of image "slime" has invalid fps (NaN)'],
+    [{ name: "" }, "Clip name can't be empty"],
+    [{ name: "clip-2" }, 'Clip "clip-2" already exists'],
+  ])("rejects %o and changes nothing", async (changes, message) => {
+    const ctx = await withSheet();
+    await ctx.library.addClip("slime");
+    await ctx.library.addClip("slime");
+    const before = structuredClone(ctx.storage?.images.get("slime")?.sheet);
+    await expect(ctx.library.updateClip("slime", "clip", changes)).rejects.toThrow(message);
+    expect(ctx.storage?.images.get("slime")?.sheet).toEqual(before);
+    expect(ctx.library.image("slime").sheet).toEqual(before);
+    expect(ctx.assets.getAnimation("slime", "clip")).toEqual({ frames: [0], fps: 8, loop: true });
+  });
+
+  it("rejects an unknown clip", async () => {
+    const ctx = await withSheet();
+    await expect(ctx.library.updateClip("slime", "nope", { fps: 1 })).rejects.toThrow(
+      'Clip "nope" not found',
+    );
+    await expect(ctx.library.removeClip("slime", "nope")).rejects.toThrow('Clip "nope" not found');
+  });
+
+  it("removes a clip", async () => {
+    const ctx = await withSheet();
+    await ctx.library.addClip("slime");
+    await ctx.library.removeClip("slime", "clip");
+    expect(ctx.storage?.images.get("slime")?.sheet?.animations).toEqual({});
+    expect(ctx.assets.hasAnimation("slime", "clip")).toBe(false);
+  });
+
+  it("applies quick successive edits in order", async () => {
+    const ctx = await withSheet();
+    await Promise.all([
+      ctx.library.addClip("slime"),
+      ctx.library.addClip("slime"),
+      ctx.library.updateClip("slime", "clip", { fps: 3 }),
+      ctx.library.removeClip("slime", "clip-2"),
+    ]);
+    expect(ctx.storage?.images.get("slime")?.sheet?.animations).toEqual({
+      clip: { frames: [0], fps: 3, loop: true },
+    });
+  });
+});
+
+describe("ImageLibrary edits that are refused", () => {
+  it("refuses to edit a built-in", async () => {
+    const ctx = setup();
+    await ctx.library.load();
+    const message = `Image "hero" is defined in code and can't be changed here`;
+    await expect(ctx.library.setFrameSize("hero", 8, 8)).rejects.toThrow(message);
+    await expect(ctx.library.addClip("hero")).rejects.toThrow(message);
+    await expect(ctx.library.updateClip("hero", "idle", { fps: 1 })).rejects.toThrow(message);
+    await expect(ctx.library.removeClip("hero", "idle")).rejects.toThrow(message);
+  });
+
+  it("refuses to edit an image that failed to load", async () => {
+    const ctx = setup();
+    ctx.storage?.images.set("broken", { name: "broken", file: ctx.junk() });
+    await ctx.library.load();
+    await expect(ctx.library.setFrameSize("broken", 8, 8)).rejects.toThrow(
+      'Image "broken" could not be loaded; delete it and upload it again',
+    );
+  });
+
+  it("keeps the last saved version when the store fails", async () => {
+    const ctx = await withSlime();
+    await ctx.library.setFrameSize("slime", 16, 16);
+    ctx.storage!.failWith = "quota exceeded";
+    await expect(ctx.library.setFrameSize("slime", 32, 32)).rejects.toThrow(
+      "Couldn't save image: quota exceeded",
+    );
+    expect(ctx.library.image("slime").sheet?.frameWidth).toBe(16);
+    expect(ctx.assets.frameCount("slime")).toBe(8);
+    ctx.storage!.failWith = null;
+    expect(ctx.storage?.images.get("slime")?.sheet?.frameWidth).toBe(16);
+  });
+});

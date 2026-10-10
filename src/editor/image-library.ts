@@ -1,13 +1,15 @@
 import {
+  checkSheet,
   imageSource,
   withoutBuiltInClashes,
+  type AnimationClip,
   type Assets,
   type ImageSource,
   type ImageStore,
   type StoredImage,
   type StoredSheet,
 } from "../engine";
-import { imageNameFromFile } from "./image-names";
+import { imageNameFromFile, uniqueName } from "./image-names";
 
 export interface ImageLibraryOptions {
   /** The images declared in code; read-only here. */
@@ -30,6 +32,29 @@ export interface ImageInfo {
   height: number | null;
   frameCount: number | null;
   error: string | null;
+}
+
+/** The parts of a clip to change; a new `name` renames it in place. */
+export interface ClipChanges {
+  name?: string;
+  frames?: number[];
+  fps?: number;
+  loop?: boolean;
+}
+
+/** A new record, so a rejected edit never touches the stored one. */
+function withSheet(image: StoredImage, sheet: StoredSheet | undefined): StoredImage {
+  return sheet ? { name: image.name, file: image.file, sheet } : { name: image.name, file: image.file };
+}
+
+function requireSheet(image: StoredImage): StoredSheet {
+  if (!image.sheet) throw new Error("Set a frame size before adding clips");
+  return image.sheet;
+}
+
+function requireClip(sheet: StoredSheet, clip: string): AnimationClip {
+  if (!Object.hasOwn(sheet.animations, clip)) throw new Error(`Clip "${clip}" not found`);
+  return sheet.animations[clip];
 }
 
 function messageOf(error: unknown): string {
@@ -139,6 +164,73 @@ export class ImageLibrary {
     });
   }
 
+  /** Both null makes it a single image again (only once it has no clips). */
+  setFrameSize(name: string, width: number | null, height: number | null): Promise<void> {
+    return this.edit(name, (image) => {
+      if ((width === null) !== (height === null)) {
+        throw new Error("Set both frame width and height, or neither");
+      }
+      if (width === null || height === null) {
+        if (image.sheet && Object.keys(image.sheet.animations).length > 0) {
+          throw new Error("Remove the clips before making this a single image");
+        }
+        return withSheet(image, undefined);
+      }
+      return withSheet(image, {
+        frameWidth: width,
+        frameHeight: height,
+        animations: image.sheet?.animations ?? {},
+      });
+    });
+  }
+
+  /** Adds "clip" (or "clip-2"…) playing frame 0 at 8 fps, looping. Resolves to its name. */
+  async addClip(name: string): Promise<string> {
+    let added = "";
+    await this.edit(name, (image) => {
+      const sheet = requireSheet(image);
+      added = uniqueName("clip", Object.keys(sheet.animations));
+      return withSheet(image, {
+        ...sheet,
+        animations: { ...sheet.animations, [added]: { frames: [0], fps: 8, loop: true } },
+      });
+    });
+    return added;
+  }
+
+  updateClip(name: string, clip: string, changes: ClipChanges): Promise<void> {
+    return this.edit(name, (image) => {
+      const sheet = requireSheet(image);
+      const current = requireClip(sheet, clip);
+      const newName = changes.name ?? clip;
+      if (newName === "") throw new Error("Clip name can't be empty");
+      if (newName !== clip && Object.hasOwn(sheet.animations, newName)) {
+        throw new Error(`Clip "${newName}" already exists`);
+      }
+      const updated: AnimationClip = {
+        frames: [...(changes.frames ?? current.frames)],
+        fps: changes.fps ?? current.fps,
+        loop: changes.loop ?? current.loop ?? true,
+      };
+      const animations: Record<string, AnimationClip> = {};
+      for (const [key, value] of Object.entries(sheet.animations)) {
+        if (key === clip) animations[newName] = updated;
+        else animations[key] = value;
+      }
+      return withSheet(image, { ...sheet, animations });
+    });
+  }
+
+  removeClip(name: string, clip: string): Promise<void> {
+    return this.edit(name, (image) => {
+      const sheet = requireSheet(image);
+      requireClip(sheet, clip);
+      const animations = { ...sheet.animations };
+      delete animations[clip];
+      return withSheet(image, { ...sheet, animations });
+    });
+  }
+
   private sheetOf(name: string): StoredSheet | null {
     if (this.isBuiltIn(name)) {
       const source = this.options.builtIns[name];
@@ -162,6 +254,32 @@ export class ImageLibrary {
     const image = this.uploaded.get(name);
     if (!image) throw new Error(`Image "${name}" not found`);
     return image;
+  }
+
+  /**
+   * Builds the next version of an uploaded, loaded image with `change`, checks it
+   * against the image's size, saves it, then reloads it into Assets.
+   */
+  private edit(name: string, change: (image: StoredImage) => StoredImage): Promise<void> {
+    return this.write(async () => {
+      const current = this.checkUploaded(name);
+      const { assets, store } = this.options;
+      if (!assets.hasImage(name)) {
+        throw new Error(`Image "${name}" could not be loaded; delete it and upload it again`);
+      }
+      const next = change(current);
+      if (next.sheet) {
+        const { width, height } = assets.getImage(name);
+        checkSheet(name, width, height, next.sheet);
+      }
+      try {
+        await store.save(next);
+      } catch (error) {
+        throw new Error(`Couldn't save image: ${messageOf(error)}`);
+      }
+      this.uploaded.set(name, next);
+      await this.loadIntoAssets(next);
+    });
   }
 
   private async loadIntoAssets(image: StoredImage): Promise<void> {
