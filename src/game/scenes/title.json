@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "entities": [
+    {
+      "name": "Background",
+      "components": {
+        "Transform": { "x": 0, "y": 0 },
+        "Sprite": { "image": "background" },
+        "Layer": { "value": -1 }
+      }
+    },
+    {
+      "name": "Prompt",
+      "components": {
+        "Transform": { "x": 400, "y": 260 },
+        "Text": { "value": "Press Enter to start", "size": 32, "align": "center" }
+      }
+    },
+    {
+      "name": "Plays label",
+      "components": {
+        "Transform": { "x": 400, "y": 310 },
+        "Text": { "value": "Games played: 0", "size": 20, "color": "#cbd5e1", "align": "center" }
+      }
+    }
+  ]
+}

@@ -1,30 +1,25 @@
-import { Game } from "../engine";
+import { browserSceneStore, Game } from "../engine";
+import { definition } from "./definition";
 import { drawError } from "./errors";
 import { Plays } from "./resources";
-import { playScene } from "./scenes/play";
-import { titleScene } from "./scenes/title";
 
-const game = new Game({ canvas: "#game", width: 800, height: 600, pixelArt: true });
+const game = new Game({
+  canvas: "#game",
+  width: definition.width,
+  height: definition.height,
+  pixelArt: definition.pixelArt,
+  components: definition.components,
+  sceneStore: browserSceneStore(),
+});
 
 try {
-  await game.assets.loadImages({
-    background: "/background.svg",
-    hero: {
-      url: "/hero.svg",
-      frameWidth: 16,
-      frameHeight: 16,
-      animations: {
-        idle: { frames: [0, 1], fps: 2 },
-        walk: { frames: [2, 3, 4, 5], fps: 8 },
-      },
-    },
-  });
+  await game.assets.loadImages(definition.images);
+  game.addGlobalResource(new Plays());
+  for (const [name, { scene, data }] of Object.entries(definition.scenes)) {
+    game.addScene(name, scene, data);
+  }
+  game.start(definition.firstScene);
 } catch (error) {
   drawError(game.canvas, error);
   throw error;
 }
-
-game.addGlobalResource(new Plays());
-game.addScene("title", titleScene);
-game.addScene("play", playScene);
-game.start("title");

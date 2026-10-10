@@ -1,14 +1,4 @@
-import {
-  Canvas,
-  Keyboard,
-  Layer,
-  Scenes,
-  Sprite,
-  Text,
-  Transform,
-  type Scene,
-  type World,
-} from "../../engine";
+import { findByName, Keyboard, Scenes, Text, type Scene, type World } from "../../engine";
 import { Plays } from "../resources";
 
 /** Starts the game when Enter is pressed. */
@@ -18,31 +8,14 @@ export function startOnEnter(world: World): void {
   }
 }
 
-/** The title screen: a prompt and the number of games played so far. */
+/** The title screen. Its entities come from title.json. */
 export const titleScene: Scene = {
   setup(scene) {
     const { world } = scene;
-    const { width, height } = world.getResource(Canvas);
-
-    const background = world.spawn();
-    world.add(background, new Transform(0, 0));
-    world.add(background, new Sprite("background"));
-    world.add(background, new Layer(-1));
-
-    const prompt = world.spawn();
-    world.add(prompt, new Transform(width / 2, height / 2 - 40));
-    world.add(prompt, new Text("Press Enter to start", { size: 32, align: "center" }));
-
-    const plays = world.spawn();
-    world.add(plays, new Transform(width / 2, height / 2 + 10));
-    world.add(
-      plays,
-      new Text(`Games played: ${world.getResource(Plays).count}`, {
-        size: 20,
-        color: "#cbd5e1",
-        align: "center",
-      }),
-    );
+    // The label may have been removed in the editor.
+    const label = findByName(world, "Plays label");
+    const text = label === undefined ? undefined : world.get(label, Text);
+    if (text) text.value = `Games played: ${world.getResource(Plays).count}`;
 
     scene.addSystem(startOnEnter);
   },

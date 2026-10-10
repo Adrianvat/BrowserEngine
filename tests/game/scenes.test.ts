@@ -1,9 +1,29 @@
 import { describe, it, expect } from "vitest";
-import { Keyboard, Scenes, Text, World, type Scene, type System } from "../../src/engine";
+import {
+  ComponentRegistry,
+  Keyboard,
+  Rect,
+  Scenes,
+  spawnSceneData,
+  Text,
+  validateSceneData,
+  World,
+  type Scene,
+  type System,
+} from "../../src/engine";
+import { Velocity } from "../../src/game/components";
+import { definition } from "../../src/game/definition";
 import { Plays } from "../../src/game/resources";
 import { backToTitle, playScene } from "../../src/game/scenes/play";
 import { startOnEnter, titleScene } from "../../src/game/scenes/title";
 import { recordingCanvas } from "../helpers/recording-canvas";
+
+const registry = new ComponentRegistry(definition.components);
+
+/** Spawns a scene's default data, as Game does before setup. */
+function spawnDefault(world: World, scene: string): void {
+  spawnSceneData(world, validateSceneData(definition.scenes[scene].data, registry), registry);
+}
 
 /** A world with the resources the demo scenes use, as Game would provide them. */
 function sceneWorld(plays = new Plays()) {
@@ -66,22 +86,28 @@ describe("backToTitle", () => {
 });
 
 describe("titleScene", () => {
-  it("shows the prompt and how many games were played, and listens for Enter", () => {
+  it("shows the number of games played on the Plays label, and listens for Enter", () => {
     const plays = new Plays();
     plays.count = 3;
     const { world } = sceneWorld(plays);
+    spawnDefault(world, "title");
     const systems = runSetup(titleScene, world);
     expect(texts(world)).toEqual(["Press Enter to start", "Games played: 3"]);
     expect(systems).toContain(startOnEnter);
   });
+
+  it("still starts when the Plays label was removed in the editor", () => {
+    const { world } = sceneWorld();
+    expect(() => runSetup(titleScene, world)).not.toThrow();
+  });
 });
 
 describe("playScene", () => {
-  it("counts the play, shows the hint, and listens for Escape", () => {
+  it("counts the play, adds 10 bouncing rects, and listens for Escape", () => {
     const { world, plays } = sceneWorld();
     const systems = runSetup(playScene, world);
     expect(plays.count).toBe(1);
-    expect(texts(world)).toEqual(["Esc: back to title"]);
+    expect(world.query(Rect, Velocity)).toHaveLength(10);
     expect(systems).toContain(backToTitle);
   });
 });
