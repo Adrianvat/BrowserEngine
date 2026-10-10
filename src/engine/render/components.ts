@@ -50,3 +50,34 @@ export class Sprite {
 export class Layer {
   constructor(public value = 0) {}
 }
+
+export type TextAlign = "left" | "center" | "right";
+
+export interface TextOptions {
+  /** Font size in pixels. Defaults to 16. */
+  size?: number;
+  /** CSS color. Defaults to "white". */
+  color?: string;
+  /** CSS font family. Defaults to "sans-serif". */
+  font?: string;
+  /** Whether the Transform's x is the text's left edge, center, or right edge. Defaults to "left". */
+  align?: TextAlign;
+}
+
+/** Draws one line of text; the Transform is the top of the text. */
+export class Text {
+  size: number;
+  color: string;
+  font: string;
+  align: TextAlign;
+
+  constructor(
+    public value: string,
+    options: TextOptions = {},
+  ) {
+    this.size = options.size ?? 16;
+    this.color = options.color ?? "white";
+    this.font = options.font ?? "sans-serif";
+    this.align = options.align ?? "left";
+  }
+}

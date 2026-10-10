@@ -1,7 +1,7 @@
 import { Assets } from "../assets/assets";
 import type { Entity, World } from "../ecs/world";
 import { Canvas } from "./canvas";
-import { Layer, Rect, Sprite, Transform } from "./components";
+import { Layer, Rect, Sprite, Text, Transform } from "./components";
 
 interface DrawItem {
   layer: number;
@@ -10,8 +10,8 @@ interface DrawItem {
 }
 
 /**
- * Built-in render system: clears the canvas, then draws every Rect and Sprite
- * by layer, then spawn order.
+ * Built-in render system: clears the canvas, then draws every Rect, Sprite
+ * and Text by layer, then spawn order.
  */
 export function render(world: World): void {
   const { ctx, width, height } = world.getResource(Canvas);
@@ -41,7 +41,16 @@ export function render(world: World): void {
     }
   }
 
-  // sort() is stable and rects were added first, so an entity's rect is drawn under its sprite.
+  for (const [entity, transform, text] of world.query(Transform, Text)) {
+    items.push({
+      layer: layerOf(world, entity),
+      entity,
+      draw: () => drawText(ctx, transform, text),
+    });
+  }
+
+  // sort() is stable and items were added rects, then sprites, then text, so within
+  // one entity the text is on top of its sprite, which is on top of its rect.
   items.sort((a, b) => a.layer - b.layer || a.entity - b.entity);
   for (const item of items) item.draw();
 }
@@ -71,4 +80,12 @@ function drawSprite(
   ctx.scale(sprite.flipX ? -1 : 1, sprite.flipY ? -1 : 1);
   ctx.drawImage(image, sx, sy, sw, sh, 0, 0, w, h);
   ctx.restore();
+}
+
+function drawText(ctx: CanvasRenderingContext2D, transform: Transform, text: Text): void {
+  ctx.font = `${text.size}px ${text.font}`;
+  ctx.fillStyle = text.color;
+  ctx.textAlign = text.align;
+  ctx.textBaseline = "top";
+  ctx.fillText(text.value, transform.x, transform.y);
 }

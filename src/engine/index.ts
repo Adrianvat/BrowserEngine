@@ -8,5 +8,5 @@ export { Assets } from "./assets/assets";
 export type { AnimationClip, Frame, ImageLoader, ImageSource, SheetSource } from "./assets/assets";
 export { Animator } from "./animation/animator";
 export { Canvas } from "./render/canvas";
-export { Transform, Rect, Sprite, Layer } from "./render/components";
-export type { SpriteOptions } from "./render/components";
+export { Transform, Rect, Sprite, Layer, Text } from "./render/components";
+export type { SpriteOptions, TextOptions } from "./render/components";

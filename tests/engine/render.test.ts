@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Assets } from "../../src/engine/assets/assets";
 import { World } from "../../src/engine/ecs/world";
-import { Layer, Rect, Sprite, Transform } from "../../src/engine/render/components";
+import { Layer, Rect, Sprite, Text, Transform } from "../../src/engine/render/components";
 import { render } from "../../src/engine/render/systems";
 import { recordingCanvas } from "../helpers/recording-canvas";
 
@@ -10,7 +10,7 @@ const heroImage = { width: 64, height: 32 } as HTMLImageElement; // 4x2 frames o
 
 async function setup() {
   const world = new World();
-  const { canvas, calls } = recordingCanvas(100, 100);
+  const { canvas, calls, texts } = recordingCanvas(100, 100);
   const files: Record<string, HTMLImageElement> = { "/bg.png": bgImage, "/hero.png": heroImage };
   const assets = new Assets(async (url) => files[url]);
   await assets.loadImages({
@@ -29,7 +29,7 @@ async function setup() {
   const draws = () => calls.slice(1);
   /** Short names for draw order checks: the rect's color, or "drawImage". */
   const order = () => draws().map((call) => (call[0] === "fillRect" ? call[1] : call[0]));
-  return { world, calls, spawn, draws, order };
+  return { world, calls, texts, spawn, draws, order };
 }
 
 describe("render", () => {
@@ -137,4 +137,60 @@ describe("render", () => {
     spawn(new Transform(), new Sprite("nope"));
     expect(() => render(world)).toThrow('Image "nope" is not loaded');
   });
+
+  it("draws text at the Transform with its font, color, alignment and a top baseline", async () => {
+    const { world, spawn, draws, texts } = await setup();
+    spawn(
+      new Transform(10, 20),
+      new Text("Hi", { size: 24, color: "red", font: "monospace", align: "center" }),
+    );
+    render(world);
+    expect(draws()).toEqual([["fillText", "Hi", 10, 20]]);
+    expect(texts).toEqual([
+      {
+        value: "Hi",
+        x: 10,
+        y: 20,
+        font: "24px monospace",
+        fillStyle: "red",
+        textAlign: "center",
+        textBaseline: "top",
+      },
+    ]);
+  });
+
+  it("uses 16px white sans-serif, left-aligned, by default", async () => {
+    const { world, spawn, texts } = await setup();
+    spawn(new Transform(), new Text("a"));
+    render(world);
+    expect(texts[0]).toMatchObject({
+      font: "16px sans-serif",
+      fillStyle: "white",
+      textAlign: "left",
+    });
+  });
+
+  it("sorts text by layer with rects and sprites", async () => {
+    const { world, spawn, order } = await setup();
+    spawn(new Transform(), new Rect(1, 1, "red"));
+    spawn(new Transform(), new Text("under"), new Layer(-1));
+    spawn(new Transform(), new Sprite("bg"), new Layer(1));
+    render(world);
+    expect(order()).toEqual(["fillText", "red", "drawImage"]);
+  });
+
+  it("draws an entity's text on top of its own rect and sprite", async () => {
+    const { world, spawn, order } = await setup();
+    spawn(new Transform(), new Text("label"), new Sprite("bg"), new Rect(1, 1, "red"));
+    render(world);
+    expect(order()).toEqual(["red", "drawImage", "fillText"]);
+  });
+
+  it("skips text without a Transform", async () => {
+    const { world, spawn, draws } = await setup();
+    spawn(new Text("lost"));
+    render(world);
+    expect(draws()).toEqual([]);
+  });
 });
+
