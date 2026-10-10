@@ -1,4 +1,4 @@
-import { browserSceneStore, Game } from "../engine";
+import { browserImageStore, browserSceneStore, Game, toImageSources } from "../engine";
 import { definition } from "./definition";
 import { drawError } from "./errors";
 import { Plays } from "./resources";
@@ -18,7 +18,10 @@ const game = new Game({
 });
 
 try {
-  await game.assets.loadImages(definition.images);
+  const stored = await (await browserImageStore()).list();
+  await game.assets.loadImages(
+    toImageSources(stored, definition.images, (file) => URL.createObjectURL(file)),
+  );
   game.addGlobalResource(new Plays());
   for (const [name, { scene, data }] of Object.entries(definition.scenes)) {
     game.addScene(name, scene, data);
