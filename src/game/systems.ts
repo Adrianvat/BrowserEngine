@@ -1,11 +1,7 @@
-import { Assets, Canvas, Keyboard, Rect, Sprite, Transform, type World } from "../engine";
+import { Animator, Assets, Canvas, Keyboard, Rect, Sprite, Transform, type World } from "../engine";
 import { Player, Velocity } from "./components";
 
 export const PLAYER_SPEED = 300;
-
-/** Frames in hero.svg. */
-const STANDING_FRAME = 0;
-const MOVING_FRAME = 1;
 
 export function playerInput(world: World): void {
   const keyboard = world.getResource(Keyboard);
@@ -64,11 +60,11 @@ export function clampPlayer(world: World): void {
   }
 }
 
-/** Picks the player's frame and facing from its velocity. */
+/** Picks the player's animation and facing from its velocity. */
 export function playerAppearance(world: World): void {
-  for (const [, , velocity, sprite] of world.query(Player, Velocity, Sprite)) {
+  for (const [, , velocity, sprite, animator] of world.query(Player, Velocity, Sprite, Animator)) {
     const moving = velocity.x !== 0 || velocity.y !== 0;
-    sprite.frame = moving ? MOVING_FRAME : STANDING_FRAME;
+    animator.play(moving ? "walk" : "idle");
     if (velocity.x < 0) sprite.flipX = true;
     else if (velocity.x > 0) sprite.flipX = false;
   }

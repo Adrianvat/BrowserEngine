@@ -1,4 +1,4 @@
-import { Canvas, Game, Layer, Rect, Sprite, Transform } from "../engine";
+import { Animator, Canvas, Game, Layer, Rect, Sprite, Transform } from "../engine";
 import { Player, Velocity } from "./components";
 import { drawError } from "./errors";
 import { bounce, clampPlayer, movement, playerAppearance, playerInput } from "./systems";
@@ -13,7 +13,15 @@ const world = game.world;
 try {
   await game.assets.loadImages({
     background: "/background.svg",
-    hero: { url: "/hero.svg", frameWidth: 16, frameHeight: 16 },
+    hero: {
+      url: "/hero.svg",
+      frameWidth: 16,
+      frameHeight: 16,
+      animations: {
+        idle: { frames: [0, 1], fps: 2 },
+        walk: { frames: [2, 3, 4, 5], fps: 8 },
+      },
+    },
   });
 } catch (error) {
   drawError(world.getResource(Canvas), error);
@@ -31,6 +39,7 @@ world.add(player, new Transform((WIDTH - PLAYER_SIZE) / 2, (HEIGHT - PLAYER_SIZE
 world.add(player, new Sprite("hero", { width: PLAYER_SIZE, height: PLAYER_SIZE }));
 world.add(player, new Layer(1));
 world.add(player, new Velocity());
+world.add(player, new Animator("idle"));
 
 for (let i = 0; i < 10; i++) {
   const size = 12 + Math.random() * 24;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Assets, Keyboard, Sprite, Transform, World } from "../../src/engine";
+import { Animator, Assets, Keyboard, Sprite, Transform, World } from "../../src/engine";
 import { Player, Velocity } from "../../src/game/components";
 import {
   clampPlayer,
@@ -61,20 +61,31 @@ describe("playerAppearance", () => {
     const player = world.spawn();
     const velocity = new Velocity();
     const sprite = new Sprite("hero");
+    const animator = new Animator("idle");
     world.add(player, new Player());
     world.add(player, velocity);
     world.add(player, sprite);
-    return { world, velocity, sprite };
+    world.add(player, animator);
+    return { world, velocity, sprite, animator };
   }
 
-  it("shows the moving frame while moving and the standing frame when still", () => {
-    const { world, velocity, sprite } = setup();
+  it("plays walk while moving and idle when still", () => {
+    const { world, velocity, animator } = setup();
     velocity.y = 10;
     playerAppearance(world);
-    expect(sprite.frame).toBe(1);
+    expect(animator.clip).toBe("walk");
     velocity.y = 0;
     playerAppearance(world);
-    expect(sprite.frame).toBe(0);
+    expect(animator.clip).toBe("idle");
+  });
+
+  it("keeps the walk going while the player keeps moving", () => {
+    const { world, velocity, animator } = setup();
+    velocity.x = 10;
+    playerAppearance(world);
+    animator.time = 0.3;
+    playerAppearance(world);
+    expect(animator.time).toBe(0.3);
   });
 
   it("faces the way it moves horizontally and keeps facing otherwise", () => {
