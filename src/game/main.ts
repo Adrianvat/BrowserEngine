@@ -10,6 +10,11 @@ const game = new Game({
   pixelArt: definition.pixelArt,
   components: definition.components,
   sceneStore: browserSceneStore(),
+  // E.g. an Animator clip or sprite frame set in the editor that doesn't exist.
+  onError: (error) => {
+    drawError(game.canvas, error);
+    console.error(error);
+  },
 });
 
 try {

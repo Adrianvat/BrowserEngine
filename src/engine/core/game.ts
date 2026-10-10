@@ -26,6 +26,11 @@ export interface GameOptions {
   components?: readonly ComponentDefinition[];
   /** Where the editor saves scenes. Without it, scenes use only their default data. */
   sceneStore?: SceneStore;
+  /**
+   * Called when a system, a scene's setup or its data throws while the game runs.
+   * The loop stops first. Without it, the exception propagates (and the loop stops).
+   */
+  onError?: (error: unknown) => void;
 }
 
 /** The running scene: its world and its systems. */
@@ -47,6 +52,7 @@ export class Game {
   /** The components scene data can use. */
   readonly registry: ComponentRegistry;
   private readonly sceneStore: SceneStore | null;
+  private readonly onError: ((error: unknown) => void) | null;
   private readonly keyboard = new Keyboard();
   private readonly sceneList = new Map<string, AddedScene>();
   private readonly scenes = new Scenes((name) => this.sceneList.has(name));
@@ -70,6 +76,7 @@ export class Game {
     this.canvas.ctx.imageSmoothingEnabled = !options.pixelArt;
     this.registry = new ComponentRegistry(options.components);
     this.sceneStore = options.sceneStore ?? null;
+    this.onError = options.onError ?? null;
     this.globalResources = [this.canvas, this.assets, this.keyboard, this.scenes];
   }
 
@@ -151,6 +158,16 @@ export class Game {
   }
 
   private readonly frame = (now: number): void => {
+    try {
+      this.runFrame(now);
+    } catch (error) {
+      if (!this.onError) throw error;
+      this.stop();
+      this.onError(error);
+    }
+  };
+
+  private runFrame(now: number): void {
     // Cleared so we can tell whether a system restarted the loop during this frame.
     this.frameId = 0;
     // The first frame's timestamp can be slightly earlier than start()'s performance.now().
@@ -178,5 +195,5 @@ export class Game {
 
     // A system may have called stop() (and maybe start(), which already scheduled a frame).
     if (this.running && this.frameId === 0) this.frameId = requestAnimationFrame(this.frame);
-  };
+  }
 }

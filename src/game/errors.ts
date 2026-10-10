@@ -14,6 +14,9 @@ export function drawError(canvas: Canvas, error: unknown): void {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#f87171";
   ctx.font = "16px monospace";
+  // The game may have left other text settings behind (e.g. centered titles).
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
   ctx.fillText("Failed to start:", MARGIN, 32);
   for (let i = 0; i * charsPerLine < message.length; i++) {
     const line = message.slice(i * charsPerLine, (i + 1) * charsPerLine);

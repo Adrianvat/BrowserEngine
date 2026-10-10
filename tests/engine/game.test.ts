@@ -485,3 +485,33 @@ describe("Scene data", () => {
     expect(findByName(game.world, "Saved")).toBeDefined();
   });
 });
+
+describe("Errors while running", () => {
+  it("stops the loop and hands a system's exception to onError", () => {
+    const errors: unknown[] = [];
+    const canvas = new FakeCanvasElement() as unknown as HTMLCanvasElement;
+    const game = new Game({ canvas, width: 100, height: 100, onError: (error) => errors.push(error) });
+    startWith(game, (scene) =>
+      scene.addSystem(() => {
+        throw new Error("boom");
+      }),
+    );
+    tick(20);
+    expect(errors).toHaveLength(1);
+    expect((errors[0] as Error).message).toBe("boom");
+    expect(pendingFrames.size).toBe(0);
+    // Stopped, so start works again.
+    game.start("main");
+    expect(pendingFrames.size).toBe(1);
+  });
+
+  it("without onError, a system's exception still propagates", () => {
+    const game = makeGame();
+    startWith(game, (scene) =>
+      scene.addSystem(() => {
+        throw new Error("boom");
+      }),
+    );
+    expect(() => tick(20)).toThrow("boom");
+  });
+});

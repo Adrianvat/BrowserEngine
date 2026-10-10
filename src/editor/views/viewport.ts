@@ -8,19 +8,9 @@ import {
   type Entity,
   type Text,
 } from "../../engine";
+import { Drag } from "../drag";
 import { entityBox, hasDrawable, hitTest, MARKER_SIZE } from "../hit-test";
 import type { EditorModel } from "../model";
-
-interface Drag {
-  index: number;
-  /** Pointer position at the press, in scene pixels. */
-  startX: number;
-  startY: number;
-  /** The entity's position at the press. */
-  fromX: number;
-  fromY: number;
-  moved: boolean;
-}
 
 /** Draws the scene with the engine's renderer; click selects, drag moves. */
 export function mountViewport(element: HTMLCanvasElement, model: EditorModel, assets: Assets): void {
@@ -99,41 +89,33 @@ export function mountViewport(element: HTMLCanvasElement, model: EditorModel, as
     model.select(index === -1 ? null : index);
     if (index === -1) return;
     const transform = model.data.entities[index].components.Transform ?? {};
-    drag = {
-      index,
-      startX: point.x,
-      startY: point.y,
-      fromX: typeof transform.x === "number" ? transform.x : 0,
-      fromY: typeof transform.y === "number" ? transform.y : 0,
-      moved: false,
-    };
+    drag = new Drag(index, point, {
+      x: typeof transform.x === "number" ? transform.x : 0,
+      y: typeof transform.y === "number" ? transform.y : 0,
+    });
     element.setPointerCapture(event.pointerId);
   });
 
   element.addEventListener("pointermove", (event) => {
     if (!drag) return;
-    const point = toScene(event);
-    drag.moved = true;
-    model.move(
-      drag.index,
-      drag.fromX + point.x - drag.startX,
-      drag.fromY + point.y - drag.startY,
-      false,
-    );
+    const { x, y } = drag.to(toScene(event));
+    model.move(drag.index, x, y, false);
   });
 
   const endDrag = () => {
-    if (drag?.moved) {
-      // Moves during the drag were not saved; save the final position once.
-      const transform = model.data.entities[drag.index].components.Transform;
-      model.move(drag.index, Number(transform.x), Number(transform.y));
-    }
+    // Moves during the drag were not saved; save the final position once.
+    const end = drag?.end();
+    if (drag && end) model.move(drag.index, end.x, end.y);
     drag = null;
   };
   element.addEventListener("pointerup", endDrag);
   element.addEventListener("pointercancel", endDrag);
 
-  model.onChange(draw);
+  model.onChange(() => {
+    // The dragged entity was removed or deselected (e.g. Delete during a drag).
+    if (drag && !drag.stillValid(model.selected)) drag = null;
+    draw();
+  });
   draw();
 }
 

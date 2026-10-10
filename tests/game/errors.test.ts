@@ -19,4 +19,14 @@ describe("drawError", () => {
     drawError(canvas, "boom");
     expect(calls.at(-1)).toEqual(["fillText", "boom", 16, 56]);
   });
+
+  it("writes left-aligned even after the game drew centered text", () => {
+    const { canvas, texts } = recordingCanvas(232, 100);
+    canvas.ctx.textAlign = "center";
+    canvas.ctx.textBaseline = "top";
+    drawError(canvas, "boom");
+    for (const text of texts) {
+      expect(text).toMatchObject({ textAlign: "left", textBaseline: "alphabetic" });
+    }
+  });
 });
