@@ -105,8 +105,17 @@
         display: flex;
         gap: 4px;
       }
+      .color {
+        min-width: 0;
+      }
       .color input[type="text"] {
         flex: 1;
+        width: 0;
+      }
+      .color input[type="color"] {
+        flex: none;
+        width: 32px;
+        padding: 0;
       }
     </style>
   </head>

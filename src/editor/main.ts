@@ -1,6 +1,8 @@
 import { Assets, browserSceneStore } from "../engine";
 import { definition } from "../game/definition";
 import { EditorModel } from "./model";
+import { mountEntityList } from "./views/entity-list";
+import { mountInspector } from "./views/inspector";
 import { mountTopBar } from "./views/top-bar";
 import { mountViewport } from "./views/viewport";
 
@@ -23,3 +25,18 @@ try {
 
 mountTopBar(element("#topbar", HTMLElement), model);
 mountViewport(element("#viewport", HTMLCanvasElement), model, assets);
+mountEntityList(element("#entities", HTMLElement), model);
+mountInspector(element("#inspector", HTMLElement), model);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Delete" || model.selected === null || model.loadError) return;
+  const target = event.target;
+  if (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLSelectElement ||
+    target instanceof HTMLTextAreaElement
+  ) {
+    return;
+  }
+  model.removeEntity(model.selected);
+});

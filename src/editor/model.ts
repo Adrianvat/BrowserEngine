@@ -149,6 +149,16 @@ export class EditorModel {
     this.save();
   }
 
+  /** A field's value as the game will see it: the saved value, or the component's default. */
+  fieldValue(index: number, name: string, field: string): unknown {
+    const entity = this.entity(index);
+    if (!Object.hasOwn(entity.components, name)) throw new Error(`Entity ${index} has no ${name}`);
+    const fields = entity.components[name];
+    if (Object.hasOwn(fields, field)) return fields[field];
+    const definition = this.registry.get(name);
+    return definition ? (new definition.type() as Record<string, unknown>)[field] : undefined;
+  }
+
   /** Moves an entity to whole pixels. A drag passes `save = false` until it ends. */
   move(index: number, x: number, y: number, save = true): void {
     const entity = this.editableEntity(index);

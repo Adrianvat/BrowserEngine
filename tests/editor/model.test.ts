@@ -239,6 +239,26 @@ describe("fields", () => {
   });
 });
 
+describe("fieldValue", () => {
+  it("returns the saved value, or the component's default when the data leaves it out", () => {
+    const { model } = setup();
+    model.setField(1, "Rect", "color", "red");
+    expect(model.fieldValue(1, "Rect", "color")).toBe("red");
+    expect(model.fieldValue(1, "Rect", "width")).toBe(32);
+  });
+
+  it("is undefined for an empty optional number", () => {
+    const { model } = setup();
+    model.addComponent(0, "Sprite");
+    expect(model.fieldValue(0, "Sprite", "width")).toBeUndefined();
+  });
+
+  it("rejects a component the entity does not have", () => {
+    const { model } = setup();
+    expect(() => model.fieldValue(0, "Rect", "width")).toThrow("Entity 0 has no Rect");
+  });
+});
+
 describe("moving", () => {
   it("move sets the Transform to whole pixels and saves", () => {
     const { model, stored } = setup();
