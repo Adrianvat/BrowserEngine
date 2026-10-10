@@ -1,5 +1,13 @@
 import { animate } from "../animation/animate";
 import { Assets } from "../assets/assets";
+import { ComponentRegistry, type ComponentDefinition } from "../data/registry";
+import {
+  parseSceneData,
+  spawnSceneData,
+  validateSceneData,
+  type SceneData,
+} from "../data/scene-data";
+import type { SceneStore } from "../data/scene-store";
 import { World, type System } from "../ecs/world";
 import { Keyboard } from "../input/keyboard";
 import { Canvas } from "../render/canvas";
@@ -14,6 +22,10 @@ export interface GameOptions {
   height: number;
   /** Turn off image smoothing so scaled-up pixel art stays sharp. */
   pixelArt?: boolean;
+  /** The game's own editable components; the built-in ones are always registered. */
+  components?: readonly ComponentDefinition[];
+  /** Where the editor saves scenes. Without it, scenes use only their default data. */
+  sceneStore?: SceneStore;
 }
 
 /** The running scene: its world and its systems. */
@@ -23,11 +35,20 @@ interface ActiveScene {
   renderSystems: System[];
 }
 
+/** A scene added to the game, with its default data (if any). */
+interface AddedScene {
+  scene: Scene;
+  data: unknown;
+}
+
 export class Game {
   readonly assets = new Assets();
   readonly canvas: Canvas;
+  /** The components scene data can use. */
+  readonly registry: ComponentRegistry;
+  private readonly sceneStore: SceneStore | null;
   private readonly keyboard = new Keyboard();
-  private readonly sceneList = new Map<string, Scene>();
+  private readonly sceneList = new Map<string, AddedScene>();
   private readonly scenes = new Scenes((name) => this.sceneList.has(name));
   /** Added to every scene's World; the same objects each time. */
   private readonly globalResources: object[];
@@ -47,6 +68,8 @@ export class Game {
     }
     this.canvas = new Canvas(element, options.width, options.height);
     this.canvas.ctx.imageSmoothingEnabled = !options.pixelArt;
+    this.registry = new ComponentRegistry(options.components);
+    this.sceneStore = options.sceneStore ?? null;
     this.globalResources = [this.canvas, this.assets, this.keyboard, this.scenes];
   }
 
@@ -55,9 +78,10 @@ export class Game {
     return this.scene.world;
   }
 
-  addScene(name: string, scene: Scene): void {
+  /** Adds a scene. `data` is its default scene data, used until the editor saves a copy. */
+  addScene(name: string, scene: Scene, data?: unknown): void {
     if (this.sceneList.has(name)) throw new Error(`Scene "${name}" is already added`);
-    this.sceneList.set(name, scene);
+    this.sceneList.set(name, { scene, data });
   }
 
   /** Adds a resource to every scene's World (and to the running one, if any). */
@@ -69,6 +93,8 @@ export class Game {
   /** Starts the loop with a fresh instance of the named scene. */
   start(sceneName: string): void {
     if (this.running) return;
+    // Check every scene's data now, so a broken scene fails before the loop starts.
+    for (const [name, added] of this.sceneList) this.sceneData(name, added.data);
     this.enterScene(sceneName);
     this.running = true;
     this.keyboard.attach(window);
@@ -91,14 +117,17 @@ export class Game {
 
   /** Replaces the running scene with a fresh instance of the named one. */
   private enterScene(name: string): void {
-    const scene = this.sceneList.get(name);
-    if (!scene) throw new Error(`Scene "${name}" not found`);
+    const added = this.sceneList.get(name);
+    if (!added) throw new Error(`Scene "${name}" not found`);
+    // Read before anything changes, so bad data leaves the running scene alone.
+    const data = this.sceneData(name, added.data);
     const world = new World();
     for (const resource of this.globalResources) world.setResource(resource);
     const active: ActiveScene = { world, updateSystems: [], renderSystems: [render] };
     this.active = active;
     this.scenes.enter(name);
-    scene.setup({
+    if (data) spawnSceneData(world, data, this.registry);
+    added.scene.setup({
       world,
       addSystem: (system) => {
         active.updateSystems.push(system);
@@ -107,6 +136,18 @@ export class Game {
         active.renderSystems.push(system);
       },
     });
+  }
+
+  /** The scene's saved copy if there is one, otherwise its default data (null when none). */
+  private sceneData(name: string, defaultData: unknown): SceneData | null {
+    try {
+      const saved = this.sceneStore?.load(name) ?? null;
+      if (saved !== null) return parseSceneData(saved, this.registry);
+      return defaultData === undefined ? null : validateSceneData(defaultData, this.registry);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Scene "${name}": ${message}`, { cause: error });
+    }
   }
 
   private readonly frame = (now: number): void => {

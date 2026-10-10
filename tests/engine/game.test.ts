@@ -8,6 +8,10 @@ import { Keyboard } from "../../src/engine/input/keyboard";
 import { Canvas } from "../../src/engine/render/canvas";
 import { Sprite } from "../../src/engine/render/components";
 import { Scenes, type SceneContext } from "../../src/engine/scene/scene";
+import { component } from "../../src/engine/data/registry";
+import { SceneStore } from "../../src/engine/data/scene-store";
+import { findByName, Name } from "../../src/engine/ecs/name";
+import { MemoryStorage } from "../helpers/memory-storage";
 
 // Just enough of the browser for Game to run in Node.
 class FakeCanvasElement {
@@ -363,5 +367,121 @@ describe("Game animation", () => {
     });
     tick(20); // one fixed step
     expect(sprite.frame).toBe(2);
+  });
+});
+
+class Spin {
+  speed = 0;
+}
+
+const heroData = {
+  version: 1,
+  entities: [{ name: "Hero", components: { Transform: { x: 5, y: 6 }, Spin: { speed: 2 } } }],
+};
+
+/** A game that knows Spin and saves scenes in a fake storage. */
+function makeDataGame() {
+  const storage = new MemoryStorage();
+  const store = new SceneStore(storage);
+  const canvas = new FakeCanvasElement() as unknown as HTMLCanvasElement;
+  const game = new Game({
+    canvas,
+    width: 100,
+    height: 100,
+    components: [component(Spin, "Spin", { speed: "number" })],
+    sceneStore: store,
+  });
+  return { game, store, storage };
+}
+
+describe("Scene data", () => {
+  it("knows the built-in components and the game's own", () => {
+    const { game } = makeDataGame();
+    expect(game.registry.get("Transform")).toBeDefined();
+    expect(game.registry.get("Spin")?.type).toBe(Spin);
+  });
+
+  it("spawns the scene's default data before its setup runs", () => {
+    const { game } = makeDataGame();
+    let speed: number | undefined;
+    game.addScene(
+      "main",
+      {
+        setup: (scene) => {
+          const hero = findByName(scene.world, "Hero");
+          speed = hero === undefined ? undefined : scene.world.get(hero, Spin)?.speed;
+        },
+      },
+      heroData,
+    );
+    game.start("main");
+    expect(speed).toBe(2);
+  });
+
+  it("uses the saved copy instead of the default", () => {
+    const { game, store } = makeDataGame();
+    store.save("main", { version: 1, entities: [{ name: "Saved", components: {} }] });
+    game.addScene("main", { setup() {} }, heroData);
+    game.start("main");
+    expect(findByName(game.world, "Saved")).toBeDefined();
+    expect(findByName(game.world, "Hero")).toBeUndefined();
+  });
+
+  it("start throws, naming the scene, when its saved copy is broken", () => {
+    const { game, storage } = makeDataGame();
+    storage.setItem("browser-engine:scene:main", "{oops");
+    game.addScene("main", { setup() {} }, heroData);
+    expect(() => game.start("main")).toThrow('Scene "main": Scene data is not valid JSON');
+    expect(pendingFrames.size).toBe(0);
+  });
+
+  it("start checks every scene's data, not just the first one's", () => {
+    const { game } = makeDataGame();
+    game.addScene("main", { setup() {} }, heroData);
+    game.addScene("other", { setup() {} }, { version: 2, entities: [] });
+    expect(() => game.start("main")).toThrow(
+      'Scene "other": Unsupported scene data version: 2',
+    );
+  });
+
+  it("a saved copy using a component the game no longer has is reported", () => {
+    const { game, store } = makeDataGame();
+    store.save("main", {
+      version: 1,
+      entities: [{ name: "Old", components: { Gone: {} } }],
+    });
+    game.addScene("main", { setup() {} });
+    expect(() => game.start("main")).toThrow(
+      'Scene "main": Entity 0 ("Old"): unknown component "Gone"',
+    );
+  });
+
+  it("a scene without data starts with no entities", () => {
+    const { game } = makeDataGame();
+    game.addScene("main", { setup() {} });
+    game.start("main");
+    expect(game.world.query(Name)).toEqual([]);
+  });
+
+  it("reads the saved copy again each time the scene is entered", () => {
+    const { game, store } = makeDataGame();
+    let switched = false;
+    game.addScene(
+      "main",
+      {
+        setup: (scene) =>
+          scene.addSystem((world) => {
+            if (switched) return;
+            switched = true;
+            store.save("main", { version: 1, entities: [{ name: "Saved", components: {} }] });
+            world.getResource(Scenes).switchTo("main");
+          }),
+      },
+      heroData,
+    );
+    game.start("main");
+    expect(findByName(game.world, "Hero")).toBeDefined();
+    tick(20);
+    expect(findByName(game.world, "Saved")).toBeDefined();
   });
 });

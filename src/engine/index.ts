@@ -15,6 +15,7 @@ export { SceneStore, browserSceneStore } from "./data/scene-store";
 export type { SceneStorage } from "./data/scene-store";
 export { Game } from "./core/game";
 export type { GameOptions } from "./core/game";
+export type { GameDefinition, SceneEntry } from "./core/definition";
 export { Scenes } from "./scene/scene";
 export type { Scene, SceneContext } from "./scene/scene";
 export { FIXED_STEP } from "./core/timestep";
