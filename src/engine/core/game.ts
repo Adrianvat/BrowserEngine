@@ -4,6 +4,7 @@ import { World, type System } from "../ecs/world";
 import { Keyboard } from "../input/keyboard";
 import { Canvas } from "../render/canvas";
 import { render } from "../render/systems";
+import { Scenes, type Scene } from "../scene/scene";
 import { advance, FIXED_STEP } from "./timestep";
 
 export interface GameOptions {
@@ -15,12 +16,22 @@ export interface GameOptions {
   pixelArt?: boolean;
 }
 
+/** The running scene: its world and its systems. */
+interface ActiveScene {
+  world: World;
+  updateSystems: System[];
+  renderSystems: System[];
+}
+
 export class Game {
-  readonly world = new World();
   readonly assets = new Assets();
-  private readonly updateSystems: System[] = [];
-  private readonly renderSystems: System[] = [render];
+  readonly canvas: Canvas;
   private readonly keyboard = new Keyboard();
+  private readonly sceneList = new Map<string, Scene>();
+  private readonly scenes = new Scenes((name) => this.sceneList.has(name));
+  /** Added to every scene's World; the same objects each time. */
+  private readonly globalResources: object[];
+  private active: ActiveScene | null = null;
   private running = false;
   private frameId = 0;
   private lastTime = 0;
@@ -34,25 +45,31 @@ export class Game {
     if (!(element instanceof HTMLCanvasElement)) {
       throw new Error(`Canvas element not found: ${String(options.canvas)}`);
     }
-    const canvas = new Canvas(element, options.width, options.height);
-    canvas.ctx.imageSmoothingEnabled = !options.pixelArt;
-    this.world.setResource(canvas);
-    this.world.setResource(this.assets);
-    this.world.setResource(this.keyboard);
+    this.canvas = new Canvas(element, options.width, options.height);
+    this.canvas.ctx.imageSmoothingEnabled = !options.pixelArt;
+    this.globalResources = [this.canvas, this.assets, this.keyboard, this.scenes];
   }
 
-  /** Adds a system that runs at a fixed 60 Hz, in the order added, before the built-in animation. */
-  addSystem(system: System): void {
-    this.updateSystems.push(system);
+  /** The running scene's World. */
+  get world(): World {
+    return this.scene.world;
   }
 
-  /** Adds a system that runs once per browser frame, after the built-in renderer. */
-  addRenderSystem(system: System): void {
-    this.renderSystems.push(system);
+  addScene(name: string, scene: Scene): void {
+    if (this.sceneList.has(name)) throw new Error(`Scene "${name}" is already added`);
+    this.sceneList.set(name, scene);
   }
 
-  start(): void {
+  /** Adds a resource to every scene's World (and to the running one, if any). */
+  addGlobalResource(resource: object): void {
+    this.globalResources.push(resource);
+    this.active?.world.setResource(resource);
+  }
+
+  /** Starts the loop with a fresh instance of the named scene. */
+  start(sceneName: string): void {
     if (this.running) return;
+    this.enterScene(sceneName);
     this.running = true;
     this.keyboard.attach(window);
     this.accumulator = 0;
@@ -67,6 +84,31 @@ export class Game {
     this.keyboard.detach();
   }
 
+  private get scene(): ActiveScene {
+    if (!this.active) throw new Error("No scene is running");
+    return this.active;
+  }
+
+  /** Replaces the running scene with a fresh instance of the named one. */
+  private enterScene(name: string): void {
+    const scene = this.sceneList.get(name);
+    if (!scene) throw new Error(`Scene "${name}" not found`);
+    const world = new World();
+    for (const resource of this.globalResources) world.setResource(resource);
+    const active: ActiveScene = { world, updateSystems: [], renderSystems: [render] };
+    this.active = active;
+    this.scenes.enter(name);
+    scene.setup({
+      world,
+      addSystem: (system) => {
+        active.updateSystems.push(system);
+      },
+      addRenderSystem: (system) => {
+        active.renderSystems.push(system);
+      },
+    });
+  }
+
   private readonly frame = (now: number): void => {
     // Cleared so we can tell whether a system restarted the loop during this frame.
     this.frameId = 0;
@@ -77,12 +119,17 @@ export class Game {
     const { steps, accumulator } = advance(this.accumulator, elapsed);
     this.accumulator = accumulator;
     for (let i = 0; i < steps; i++) {
-      for (const system of this.updateSystems) system(this.world, FIXED_STEP);
-      // After the game's systems, so a play() call shows its clip in the same step.
-      animate(this.world, FIXED_STEP);
+      const { world, updateSystems } = this.scene;
+      for (const system of updateSystems) system(world, FIXED_STEP);
+      // After the scene's systems, so a play() call shows its clip in the same step.
+      animate(world, FIXED_STEP);
       this.keyboard.endStep();
+      // Switching last means no system ever runs on a world that was just dropped.
+      const next = this.scenes.takeRequest();
+      if (next !== null) this.enterScene(next);
     }
-    for (const system of this.renderSystems) system(this.world, elapsed);
+    const { world, renderSystems } = this.scene;
+    for (const system of renderSystems) system(world, elapsed);
 
     // A system may have called stop() (and maybe start(), which already scheduled a frame).
     if (this.running && this.frameId === 0) this.frameId = requestAnimationFrame(this.frame);

@@ -2,6 +2,8 @@ export { World } from "./ecs/world";
 export type { Entity, ComponentType, System } from "./ecs/world";
 export { Game } from "./core/game";
 export type { GameOptions } from "./core/game";
+export { Scenes } from "./scene/scene";
+export type { Scene, SceneContext } from "./scene/scene";
 export { FIXED_STEP } from "./core/timestep";
 export { Keyboard } from "./input/keyboard";
 export { Assets } from "./assets/assets";
