@@ -119,10 +119,14 @@ export class Game {
     const { steps, accumulator } = advance(this.accumulator, elapsed);
     this.accumulator = accumulator;
     for (let i = 0; i < steps; i++) {
-      const { world, updateSystems } = this.scene;
-      for (const system of updateSystems) system(world, FIXED_STEP);
+      const active = this.scene;
+      for (const system of active.updateSystems) {
+        system(active.world, FIXED_STEP);
+        // A system restarted the game with a new scene: the old one's step ends here.
+        if (this.active !== active) break;
+      }
       // After the scene's systems, so a play() call shows its clip in the same step.
-      animate(world, FIXED_STEP);
+      if (this.active === active) animate(active.world, FIXED_STEP);
       this.keyboard.endStep();
       // Switching last means no system ever runs on a world that was just dropped.
       const next = this.scenes.takeRequest();

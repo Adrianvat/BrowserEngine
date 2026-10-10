@@ -121,6 +121,25 @@ describe("Game loop", () => {
     expect(pendingFrames.size).toBe(0);
   });
 
+  it("restarting with another scene from a system stops the old scene's step there", () => {
+    const game = makeGame();
+    const log: string[] = [];
+    game.addScene("b", { setup: () => log.push("b setup") });
+    startWith(game, (scene) => {
+      scene.addSystem(() => {
+        game.stop();
+        game.start("b");
+      });
+      scene.addSystem((world) => {
+        log.push("old system");
+        world.getResource(Scenes).switchTo("main");
+      });
+    });
+    tick(20);
+    expect(log).toEqual(["b setup"]);
+    expect(game.world.getResource(Scenes).current).toBe("b");
+  });
+
   it("wasPressed survives a frame with zero update steps", () => {
     const game = makeGame();
     const seen: boolean[] = [];
