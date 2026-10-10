@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Assets, type AnimationClip, type ImageLoader } from "../../src/engine/assets/assets";
+import { Assets, checkSheet, type AnimationClip, type ImageLoader } from "../../src/engine/assets/assets";
 
 function fakeImage(width: number, height: number): HTMLImageElement {
   return { width, height } as HTMLImageElement;
@@ -210,5 +210,48 @@ describe("Assets animations", () => {
         one: { url: "/one.png", frameWidth: 16, frameHeight: 16, animations: { a: { frames: [1], fps: 1 } } },
       }),
     ).rejects.toThrow('Animation "a" of image "one": frame 1 is out of range (1 frame)');
+  });
+});
+
+describe("checkSheet", () => {
+  it("returns the grid and the clips with loop filled in", () => {
+    const checked = checkSheet("hero", 64, 32, {
+      frameWidth: 16,
+      frameHeight: 16,
+      animations: { walk: { frames: [1, 7], fps: 8 } },
+    });
+    expect(checked.columns).toBe(4);
+    expect(checked.count).toBe(8);
+    expect(checked.animations.get("walk")).toEqual({ frames: [1, 7], fps: 8, loop: true });
+  });
+
+  it("accepts a sheet without clips", () => {
+    expect(checkSheet("s", 40, 20, { frameWidth: 16, frameHeight: 16 }).count).toBe(2);
+  });
+
+  it("throws the same messages as loadImages", () => {
+    expect(() => checkSheet("s", 64, 64, { frameWidth: 0, frameHeight: 16 })).toThrow(
+      'Invalid frame size for image "s"',
+    );
+    expect(() => checkSheet("s", 8, 8, { frameWidth: 16, frameHeight: 16 })).toThrow(
+      'Image "s" (8x8) is smaller than one 16x16 frame',
+    );
+    expect(() =>
+      checkSheet("s", 32, 16, {
+        frameWidth: 16,
+        frameHeight: 16,
+        animations: { a: { frames: [2], fps: 1 } },
+      }),
+    ).toThrow('Animation "a" of image "s": frame 2 is out of range (2 frames)');
+  });
+});
+
+describe("Assets.removeImage", () => {
+  it("forgets a loaded image and ignores unknown names", async () => {
+    const assets = new Assets(fakeLoader({ "/bg.png": fakeImage(8, 8) }));
+    await assets.loadImages({ bg: "/bg.png" });
+    assets.removeImage("bg");
+    assets.removeImage("nope");
+    expect(assets.hasImage("bg")).toBe(false);
   });
 });

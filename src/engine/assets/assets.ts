@@ -73,6 +73,41 @@ function checkAnimations(
   return checked;
 }
 
+/** A sprite sheet's layout: a SheetSource without its file. */
+export type SheetLayout = Omit<SheetSource, "url">;
+
+/** A sheet's grid and clips, checked against the image's size. */
+export interface CheckedSheet {
+  columns: number;
+  count: number;
+  animations: Map<string, Required<AnimationClip>>;
+}
+
+/**
+ * Checks a sheet layout against the image's size in pixels, with the messages
+ * loadImages uses. The editor calls it before saving a sheet.
+ */
+export function checkSheet(
+  name: string,
+  width: number,
+  height: number,
+  sheet: SheetLayout,
+): CheckedSheet {
+  const { frameWidth, frameHeight } = sheet;
+  if (!(isPositiveInteger(frameWidth) && isPositiveInteger(frameHeight))) {
+    throw new Error(`Invalid frame size for image "${name}"`);
+  }
+  const columns = Math.floor(width / frameWidth);
+  const rows = Math.floor(height / frameHeight);
+  if (columns === 0 || rows === 0) {
+    throw new Error(
+      `Image "${name}" (${width}x${height}) is smaller than one ${frameWidth}x${frameHeight} frame`,
+    );
+  }
+  const count = columns * rows;
+  return { columns, count, animations: checkAnimations(name, count, sheet.animations ?? {}) };
+}
+
 /** Images loaded before the game starts, stored as a World resource. */
 export class Assets {
   private readonly images = new Map<string, LoadedImage>();
@@ -129,6 +164,11 @@ export class Assets {
     return this.images.get(image)?.animations.has(name) ?? false;
   }
 
+  /** Forgets an image; unknown names are ignored. */
+  removeImage(name: string): void {
+    this.images.delete(name);
+  }
+
   private entry(name: string): LoadedImage {
     const entry = this.images.get(name);
     if (!entry) throw new Error(`Image "${name}" is not loaded`);
@@ -167,16 +207,8 @@ export class Assets {
       };
     }
 
+    const { columns, count, animations } = checkSheet(name, width, height, source);
     const { frameWidth, frameHeight } = source;
-    const columns = Math.floor(width / frameWidth);
-    const rows = Math.floor(height / frameHeight);
-    if (columns === 0 || rows === 0) {
-      throw new Error(
-        `Image "${name}" (${width}x${height}) is smaller than one ${frameWidth}x${frameHeight} frame`,
-      );
-    }
-    const count = columns * rows;
-    const animations = checkAnimations(name, count, source.animations ?? {});
     return { image, frameWidth, frameHeight, columns, count, animations };
   }
 }

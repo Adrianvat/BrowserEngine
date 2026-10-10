@@ -20,8 +20,16 @@ export { Scenes } from "./scene/scene";
 export type { Scene, SceneContext } from "./scene/scene";
 export { FIXED_STEP } from "./core/timestep";
 export { Keyboard } from "./input/keyboard";
-export { Assets } from "./assets/assets";
-export type { AnimationClip, Frame, ImageLoader, ImageSource, SheetSource } from "./assets/assets";
+export { Assets, checkSheet } from "./assets/assets";
+export type {
+  AnimationClip,
+  CheckedSheet,
+  Frame,
+  ImageLoader,
+  ImageSource,
+  SheetLayout,
+  SheetSource,
+} from "./assets/assets";
 export { Animator } from "./animation/animator";
 export { Canvas } from "./render/canvas";
 export { render } from "./render/systems";
