@@ -26,7 +26,7 @@ function shapeOf(model: EditorModel): string {
   const index = model.selected;
   if (index === null || model.loadError) return "none";
   const components = Object.keys(model.data.entities[index].components);
-  return JSON.stringify([model.scene, index, components]);
+  return JSON.stringify([model.scene, index, components, model.imageNames]);
 }
 
 function build(root: HTMLElement, model: EditorModel): void {

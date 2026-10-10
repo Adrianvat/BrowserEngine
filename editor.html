@@ -18,21 +18,62 @@
       }
       body {
         display: grid;
-        grid-template: "top top top" auto "list view inspector" 1fr / 200px 1fr 280px;
+        grid-template: "top top top" auto "list view inspector" 1fr / 260px 1fr 280px;
       }
-      #topbar {
-        grid-area: top;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        padding: 8px;
-        background: #1f2937;
-      }
-      #entities {
+      #sidebar {
         grid-area: list;
         overflow: auto;
         padding: 8px;
         background: #18181b;
+      }
+      #sidebar h2 {
+        margin: 4px 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        color: #a1a1aa;
+      }
+      #images {
+        border-top: 1px solid #333;
+        margin-top: 8px;
+        padding-top: 8px;
+      }
+      .tag {
+        margin-left: 6px;
+        padding: 0 4px;
+        border-radius: 3px;
+        background: #3f3f46;
+        font-size: 11px;
+      }
+      .error,
+      .tag.error {
+        color: #f87171;
+      }
+      input.invalid {
+        outline: 2px solid #f87171;
+      }
+      .image-details canvas {
+        display: block;
+        margin: 6px 0;
+        max-width: 100%;
+        background: repeating-conic-gradient(#333 0 25%, #222 0 50%) 0 0 / 16px 16px;
+      }
+      .clip {
+        display: grid;
+        grid-template-columns: 1fr 1fr 44px auto auto;
+        gap: 4px;
+        align-items: center;
+        margin: 3px 0;
+      }
+      .clip input {
+        min-width: 0;
+      }
+      .frame-size {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .frame-size input {
+        width: 56px;
       }
       #view {
         grid-area: view;
@@ -121,7 +162,10 @@
   </head>
   <body>
     <header id="topbar"></header>
-    <aside id="entities"></aside>
+    <aside id="sidebar">
+      <div id="entities"></div>
+      <div id="images"></div>
+    </aside>
     <main id="view"><canvas id="viewport"></canvas></main>
     <aside id="inspector"></aside>
     <script type="module" src="/src/editor/main.ts"></script>
