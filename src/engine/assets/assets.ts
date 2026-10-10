@@ -3,11 +3,23 @@ import { loadBrowserImage } from "./browser-loader";
 /** Loads one image file. The default downloads and decodes it in the browser. */
 export type ImageLoader = (url: string) => Promise<HTMLImageElement>;
 
+/** A named sequence of sheet frames played at a fixed speed. */
+export interface AnimationClip {
+  /** Sheet frame indices, in playback order. */
+  frames: number[];
+  /** Frames per second. */
+  fps: number;
+  /** Start again after the last frame (default true); otherwise stop on it. */
+  loop?: boolean;
+}
+
 /** An image split into a grid of equal-size frames. */
 export interface SheetSource {
   url: string;
   frameWidth: number;
   frameHeight: number;
+  /** Named clips that play frames of this sheet. */
+  animations?: Record<string, AnimationClip>;
 }
 
 /** A plain URL loads a single image; a SheetSource loads a sprite sheet. */
@@ -27,10 +39,38 @@ interface LoadedImage {
   frameHeight: number;
   columns: number;
   count: number;
+  animations: Map<string, Required<AnimationClip>>;
 }
 
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
+}
+
+function frameCountText(count: number): string {
+  return count === 1 ? "1 frame" : `${count} frames`;
+}
+
+/** Checks a sheet's clips against its frame count and copies them, filling in defaults. */
+function checkAnimations(
+  image: string,
+  count: number,
+  animations: Record<string, AnimationClip>,
+): Map<string, Required<AnimationClip>> {
+  const checked = new Map<string, Required<AnimationClip>>();
+  for (const [name, clip] of Object.entries(animations)) {
+    const label = `Animation "${name}" of image "${image}"`;
+    if (clip.frames.length === 0) throw new Error(`${label} has no frames`);
+    if (!(Number.isFinite(clip.fps) && clip.fps > 0)) {
+      throw new Error(`${label} has invalid fps (${clip.fps})`);
+    }
+    for (const frame of clip.frames) {
+      if (!Number.isInteger(frame) || frame < 0 || frame >= count) {
+        throw new Error(`${label}: frame ${frame} is out of range (${frameCountText(count)})`);
+      }
+    }
+    checked.set(name, { frames: [...clip.frames], fps: clip.fps, loop: clip.loop ?? true });
+  }
+  return checked;
 }
 
 /** Images loaded before the game starts, stored as a World resource. */
@@ -68,8 +108,7 @@ export class Assets {
   getFrame(name: string, index: number): Frame {
     const { frameWidth, frameHeight, columns, count } = this.entry(name);
     if (!Number.isInteger(index) || index < 0 || index >= count) {
-      const frames = count === 1 ? "1 frame" : `${count} frames`;
-      throw new Error(`Frame ${index} is out of range for "${name}" (${frames})`);
+      throw new Error(`Frame ${index} is out of range for "${name}" (${frameCountText(count)})`);
     }
     return {
       sx: (index % columns) * frameWidth,
@@ -77,6 +116,17 @@ export class Assets {
       sw: frameWidth,
       sh: frameHeight,
     };
+  }
+
+  /** A clip declared on a sheet; `loop` is always filled in. */
+  getAnimation(image: string, name: string): Required<AnimationClip> {
+    const clip = this.entry(image).animations.get(name);
+    if (!clip) throw new Error(`Animation "${name}" not found for image "${image}"`);
+    return clip;
+  }
+
+  hasAnimation(image: string, name: string): boolean {
+    return this.images.get(image)?.animations.has(name) ?? false;
   }
 
   private entry(name: string): LoadedImage {
@@ -107,7 +157,14 @@ export class Assets {
       if (width === 0 || height === 0) {
         throw new Error(`Image "${name}" has no size (${width}x${height})`);
       }
-      return { image, frameWidth: width, frameHeight: height, columns: 1, count: 1 };
+      return {
+        image,
+        frameWidth: width,
+        frameHeight: height,
+        columns: 1,
+        count: 1,
+        animations: new Map(),
+      };
     }
 
     const { frameWidth, frameHeight } = source;
@@ -118,6 +175,8 @@ export class Assets {
         `Image "${name}" (${width}x${height}) is smaller than one ${frameWidth}x${frameHeight} frame`,
       );
     }
-    return { image, frameWidth, frameHeight, columns, count: columns * rows };
+    const count = columns * rows;
+    const animations = checkAnimations(name, count, source.animations ?? {});
+    return { image, frameWidth, frameHeight, columns, count, animations };
   }
 }

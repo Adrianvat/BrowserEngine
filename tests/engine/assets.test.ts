@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Assets, type ImageLoader } from "../../src/engine/assets/assets";
+import { Assets, type AnimationClip, type ImageLoader } from "../../src/engine/assets/assets";
 
 function fakeImage(width: number, height: number): HTMLImageElement {
   return { width, height } as HTMLImageElement;
@@ -118,5 +118,97 @@ describe("Assets lookups", () => {
     expect(() => assets.getFrame("hero", -1)).toThrow('Frame -1 is out of range for "hero" (8 frames)');
     expect(() => assets.getFrame("hero", 1.5)).toThrow('Frame 1.5 is out of range for "hero" (8 frames)');
     expect(() => assets.getFrame("bg", 1)).toThrow('Frame 1 is out of range for "bg" (1 frame)');
+  });
+});
+
+describe("Assets animations", () => {
+  function makeAssets() {
+    return new Assets(
+      fakeLoader({ "/hero.png": fakeImage(64, 32), "/bg.png": fakeImage(50, 40) }),
+    );
+  }
+
+  /** An 8-frame hero sheet (4 columns x 2 rows of 16x16) with the given clips. */
+  function heroSheet(animations: Record<string, AnimationClip>) {
+    return { url: "/hero.png", frameWidth: 16, frameHeight: 16, animations };
+  }
+
+  it("returns declared clips, with loop defaulting to true", async () => {
+    const assets = makeAssets();
+    await assets.loadImages({
+      hero: heroSheet({
+        walk: { frames: [2, 3], fps: 8 },
+        die: { frames: [7], fps: 4, loop: false },
+      }),
+    });
+    expect(assets.getAnimation("hero", "walk")).toEqual({ frames: [2, 3], fps: 8, loop: true });
+    expect(assets.getAnimation("hero", "die")).toEqual({ frames: [7], fps: 4, loop: false });
+  });
+
+  it("hasAnimation is true only for a declared clip of a loaded sheet", async () => {
+    const assets = makeAssets();
+    await assets.loadImages({ hero: heroSheet({ walk: { frames: [0], fps: 1 } }), bg: "/bg.png" });
+    expect(assets.hasAnimation("hero", "walk")).toBe(true);
+    expect(assets.hasAnimation("hero", "jump")).toBe(false);
+    expect(assets.hasAnimation("bg", "walk")).toBe(false);
+    expect(assets.hasAnimation("nope", "walk")).toBe(false);
+  });
+
+  it("getAnimation throws for an unknown image or clip", async () => {
+    const assets = makeAssets();
+    await assets.loadImages({ hero: heroSheet({ walk: { frames: [0], fps: 1 } }) });
+    expect(() => assets.getAnimation("nope", "walk")).toThrow('Image "nope" is not loaded');
+    expect(() => assets.getAnimation("hero", "jump")).toThrow(
+      'Animation "jump" not found for image "hero"',
+    );
+  });
+
+  it("copies clips at load, so later changes to the source have no effect", async () => {
+    const assets = makeAssets();
+    const walk = { frames: [2, 3], fps: 8 };
+    await assets.loadImages({ hero: heroSheet({ walk }) });
+    walk.frames.push(99);
+    walk.fps = 0;
+    expect(assets.getAnimation("hero", "walk")).toEqual({ frames: [2, 3], fps: 8, loop: true });
+  });
+
+  it("reloading a sheet replaces its clips", async () => {
+    const assets = makeAssets();
+    await assets.loadImages({ hero: heroSheet({ walk: { frames: [0], fps: 1 } }) });
+    await assets.loadImages({ hero: heroSheet({ run: { frames: [1], fps: 1 } }) });
+    expect(assets.hasAnimation("hero", "walk")).toBe(false);
+    expect(assets.hasAnimation("hero", "run")).toBe(true);
+  });
+
+  it("rejects a clip with no frames, keeping none of the batch", async () => {
+    const assets = makeAssets();
+    await expect(
+      assets.loadImages({ bg: "/bg.png", hero: heroSheet({ walk: { frames: [], fps: 8 } }) }),
+    ).rejects.toThrow('Animation "walk" of image "hero" has no frames');
+    expect(assets.hasImage("bg")).toBe(false);
+    expect(assets.hasImage("hero")).toBe(false);
+  });
+
+  it.each([0, -1, NaN, Infinity])("rejects fps %s", async (fps) => {
+    const assets = makeAssets();
+    await expect(
+      assets.loadImages({ hero: heroSheet({ walk: { frames: [0], fps } }) }),
+    ).rejects.toThrow(`Animation "walk" of image "hero" has invalid fps (${fps})`);
+  });
+
+  it.each([8, -1, 1.5])("rejects frame %s, which is not in the sheet", async (frame) => {
+    const assets = makeAssets();
+    await expect(
+      assets.loadImages({ hero: heroSheet({ walk: { frames: [0, frame], fps: 8 } }) }),
+    ).rejects.toThrow(`Animation "walk" of image "hero": frame ${frame} is out of range (8 frames)`);
+  });
+
+  it("says (1 frame) for a one-frame sheet", async () => {
+    const assets = new Assets(fakeLoader({ "/one.png": fakeImage(16, 16) }));
+    await expect(
+      assets.loadImages({
+        one: { url: "/one.png", frameWidth: 16, frameHeight: 16, animations: { a: { frames: [1], fps: 1 } } },
+      }),
+    ).rejects.toThrow('Animation "a" of image "one": frame 1 is out of range (1 frame)');
   });
 });
