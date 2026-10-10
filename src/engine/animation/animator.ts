@@ -5,7 +5,7 @@ export class Animator {
   /** True once a clip with `loop: false` has reached its end. */
   finished = false;
 
-  constructor(public clip: string) {}
+  constructor(public clip = "") {}
 
   /** Switches to another clip from its start. Does nothing if `clip` is already playing. */
   play(clip: string): void {

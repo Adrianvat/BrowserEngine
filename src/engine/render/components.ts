@@ -9,8 +9,8 @@ export class Transform {
 /** Draws the entity as a filled rectangle. */
 export class Rect {
   constructor(
-    public width: number,
-    public height: number,
+    public width = 32,
+    public height = 32,
     public color = "white",
   ) {}
 }
@@ -35,7 +35,7 @@ export class Sprite {
   flipY: boolean;
 
   constructor(
-    public image: string,
+    public image = "",
     options: SpriteOptions = {},
   ) {
     this.frame = options.frame ?? 0;
@@ -72,7 +72,7 @@ export class Text {
   align: TextAlign;
 
   constructor(
-    public value: string,
+    public value = "",
     options: TextOptions = {},
   ) {
     this.size = options.size ?? 16;

@@ -1,5 +1,8 @@
 export { World } from "./ecs/world";
 export type { Entity, ComponentType, System } from "./ecs/world";
+export { Name, findByName } from "./ecs/name";
+export { component, ComponentRegistry } from "./data/registry";
+export type { ComponentDefinition, FieldKind } from "./data/registry";
 export { Game } from "./core/game";
 export type { GameOptions } from "./core/game";
 export { Scenes } from "./scene/scene";
