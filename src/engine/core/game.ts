@@ -1,3 +1,4 @@
+import { animate } from "../animation/animate";
 import { Assets } from "../assets/assets";
 import { World, type System } from "../ecs/world";
 import { Keyboard } from "../input/keyboard";
@@ -40,7 +41,7 @@ export class Game {
     this.world.setResource(this.keyboard);
   }
 
-  /** Adds a system that runs at a fixed 60 Hz. Systems run in the order added. */
+  /** Adds a system that runs at a fixed 60 Hz, in the order added, before the built-in animation. */
   addSystem(system: System): void {
     this.updateSystems.push(system);
   }
@@ -77,6 +78,8 @@ export class Game {
     this.accumulator = accumulator;
     for (let i = 0; i < steps; i++) {
       for (const system of this.updateSystems) system(this.world, FIXED_STEP);
+      // After the game's systems, so a play() call shows its clip in the same step.
+      animate(this.world, FIXED_STEP);
       this.keyboard.endStep();
     }
     for (const system of this.renderSystems) system(this.world, elapsed);

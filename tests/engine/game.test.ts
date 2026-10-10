@@ -4,6 +4,8 @@ import { FIXED_STEP } from "../../src/engine/core/timestep";
 import { Keyboard } from "../../src/engine/input/keyboard";
 import { Assets } from "../../src/engine/assets/assets";
 import { Canvas } from "../../src/engine/render/canvas";
+import { Animator } from "../../src/engine/animation/animator";
+import { Sprite } from "../../src/engine/render/components";
 
 // Just enough of the browser for Game to run in Node.
 class FakeCanvasElement {
@@ -136,5 +138,33 @@ describe("Game setup", () => {
     const canvas = new FakeCanvasElement() as unknown as HTMLCanvasElement;
     const game = new Game({ canvas, width: 100, height: 100, pixelArt: true });
     expect(game.world.getResource(Canvas).ctx.imageSmoothingEnabled).toBe(false);
+  });
+});
+
+describe("Game animation", () => {
+  it("animates sprites after the game's own systems in each fixed step", async () => {
+    const game = makeGame();
+    // Replaces the Assets resource with one that loads fake images (game.assets keeps the old one).
+    const assets = new Assets(async () => ({ width: 64, height: 16 }) as HTMLImageElement);
+    await assets.loadImages({
+      hero: {
+        url: "/hero.png",
+        frameWidth: 16,
+        frameHeight: 16,
+        animations: { idle: { frames: [0], fps: 1 }, walk: { frames: [2, 3], fps: 8 } },
+      },
+    });
+    game.world.setResource(assets);
+
+    // No Transform, so the renderer (whose fake context cannot draw images) skips it.
+    const sprite = new Sprite("hero");
+    const animator = new Animator("idle");
+    const entity = game.world.spawn();
+    game.world.add(entity, sprite);
+    game.world.add(entity, animator);
+    game.addSystem(() => animator.play("walk"));
+    game.start();
+    tick(20); // one fixed step
+    expect(sprite.frame).toBe(2);
   });
 });
