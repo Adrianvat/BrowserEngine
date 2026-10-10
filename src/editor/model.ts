@@ -30,6 +30,8 @@ export class EditorModel {
   constructor(
     readonly definition: GameDefinition,
     private readonly store: SceneStore,
+    /** The images sprites can use; by default the ones the definition declares. */
+    private readonly listImages: () => string[] = () => Object.keys(definition.images),
   ) {
     this.registry = new ComponentRegistry(definition.components);
     this.load(definition.firstScene);
@@ -62,11 +64,37 @@ export class EditorModel {
   }
 
   get imageNames(): string[] {
-    return Object.keys(this.definition.images);
+    return this.listImages();
   }
 
   onChange(listener: () => void): void {
     this.listeners.push(listener);
+  }
+
+  /** Call when images were added, changed or removed, so views redraw. */
+  imagesChanged(): void {
+    this.notify();
+  }
+
+  /** Every scene's current data, for finding where an image is used. Unreadable scenes are left out. */
+  allScenes(): Record<string, SceneData> {
+    const scenes: Record<string, SceneData> = {};
+    for (const [name, entry] of Object.entries(this.definition.scenes)) {
+      if (name === this.sceneName) {
+        if (this.error === null) scenes[name] = this.sceneData;
+        continue;
+      }
+      try {
+        const saved = this.store.load(name);
+        scenes[name] =
+          saved === null
+            ? validateSceneData(entry.data, this.registry)
+            : parseSceneData(saved, this.registry);
+      } catch {
+        // A broken scene is reported when it is opened; here it just has no usages.
+      }
+    }
+    return scenes;
   }
 
   openScene(name: string): void {

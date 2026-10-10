@@ -343,3 +343,49 @@ describe("load errors and reset", () => {
     expect(model.status).toEqual({ error: "Browser storage is not available" });
   });
 });
+
+describe("image names from the library", () => {
+  it("reads the names from the function it is given, each time", () => {
+    let images = ["slime"];
+    const model = new EditorModel(definition, new SceneStore(new MemoryStorage()), () => images);
+    expect(model.imageNames).toEqual(["slime"]);
+    images = ["slime", "coin"];
+    expect(model.imageNames).toEqual(["slime", "coin"]);
+  });
+
+  it("gives a new Sprite the first name from that function", () => {
+    const model = new EditorModel(definition, new SceneStore(new MemoryStorage()), () => ["slime"]);
+    model.addEntity();
+    model.addComponent(2, "Sprite");
+    expect(model.data.entities[2].components.Sprite.image).toBe("slime");
+  });
+
+  it("imagesChanged notifies listeners without saving", () => {
+    const { model, changes, stored } = setup();
+    model.imagesChanged();
+    expect(changes()).toBe(1);
+    expect(stored()).toBeNull();
+  });
+});
+
+describe("allScenes", () => {
+  it("has the open scene's edits and the other scenes' saved or default data", () => {
+    const saved = JSON.stringify({ version: 1, entities: [{ name: "Saved", components: {} }] });
+    const { model } = setup({ other: saved });
+    model.rename(0, "Edited");
+    const scenes = model.allScenes();
+    expect(Object.keys(scenes)).toEqual(["main", "other"]);
+    expect(scenes.main.entities.map((entity) => entity.name)).toEqual(["Edited", "Box"]);
+    expect(scenes.other.entities.map((entity) => entity.name)).toEqual(["Saved"]);
+  });
+
+  it("uses default data for scenes with no saved copy", () => {
+    const { model } = setup();
+    expect(model.allScenes().other).toEqual({ version: 1, entities: [] });
+  });
+
+  it("leaves out scenes whose saved copy can't be read", () => {
+    expect(Object.keys(setup({ other: "not json" }).model.allScenes())).toEqual(["main"]);
+    expect(Object.keys(setup({ main: "not json" }).model.allScenes())).toEqual(["other"]);
+  });
+});
