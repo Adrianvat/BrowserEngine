@@ -1,6 +1,8 @@
 import { Game } from "../engine";
 import { drawError } from "./errors";
+import { Plays } from "./resources";
 import { playScene } from "./scenes/play";
+import { titleScene } from "./scenes/title";
 
 const game = new Game({ canvas: "#game", width: 800, height: 600, pixelArt: true });
 
@@ -22,5 +24,7 @@ try {
   throw error;
 }
 
+game.addGlobalResource(new Plays());
+game.addScene("title", titleScene);
 game.addScene("play", playScene);
-game.start("play");
+game.start("title");

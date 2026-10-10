@@ -1,14 +1,35 @@
-import { Animator, Canvas, Layer, Rect, Sprite, Transform, type Scene } from "../../engine";
+import {
+  Animator,
+  Canvas,
+  Keyboard,
+  Layer,
+  Rect,
+  Scenes,
+  Sprite,
+  Text,
+  Transform,
+  type Scene,
+  type World,
+} from "../../engine";
 import { Player, Velocity } from "../components";
 import { bounce, clampPlayer, movement, playerAppearance, playerInput } from "../systems";
+import { Plays } from "../resources";
 
 const PLAYER_SIZE = 32;
+
+/** Returns to the title screen when Escape is pressed. */
+export function backToTitle(world: World): void {
+  if (world.getResource(Keyboard).wasPressed("Escape")) {
+    world.getResource(Scenes).switchTo("title");
+  }
+}
 
 /** The hero walking around among bouncing rects. */
 export const playScene: Scene = {
   setup(scene) {
     const { world } = scene;
     const { width, height } = world.getResource(Canvas);
+    world.getResource(Plays).count++;
 
     const background = world.spawn();
     world.add(background, new Transform(0, 0));
@@ -33,10 +54,16 @@ export const playScene: Scene = {
       world.add(e, new Velocity(Math.cos(angle) * speed, Math.sin(angle) * speed));
     }
 
+    const hint = world.spawn();
+    world.add(hint, new Transform(12, 12));
+    world.add(hint, new Text("Esc: back to title", { size: 14, color: "#cbd5e1" }));
+    world.add(hint, new Layer(2));
+
     scene.addSystem(playerInput);
     scene.addSystem(movement);
     scene.addSystem(bounce);
     scene.addSystem(clampPlayer);
     scene.addSystem(playerAppearance);
+    scene.addSystem(backToTitle);
   },
 };
