@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scene Editor</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font: 13px system-ui, sans-serif;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #111;
+        color: #e5e7eb;
+      }
+      body {
+        display: grid;
+        grid-template:
+          "projects projects projects" auto
+          "top top top" auto
+          "migration migration migration" auto
+          "list view inspector" 1fr / 260px 1fr 280px;
+      }
+      #projects,
+      #topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #18181b;
+        border-bottom: 1px solid #333;
+      }
+      #projects {
+        grid-area: projects;
+      }
+      #topbar {
+        grid-area: top;
+      }
+      .add-form {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+      }
+      .add-form .error:empty {
+        display: none;
+      }
+      .confirming {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+      }
+      .confirming .question {
+        color: #fbbf24;
+      }
+      button.danger {
+        color: #fca5a5;
+      }
+      .muted {
+        color: #a1a1aa;
+      }
+      #sidebar {
+        grid-area: list;
+        overflow: auto;
+        padding: 8px;
+        background: #18181b;
+      }
+      #sidebar h2 {
+        margin: 4px 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        color: #a1a1aa;
+      }
+      #images {
+        border-top: 1px solid #333;
+        margin-top: 8px;
+        padding-top: 8px;
+      }
+      .tag {
+        margin-left: 6px;
+        padding: 0 4px;
+        border-radius: 3px;
+        background: #3f3f46;
+        font-size: 11px;
+      }
+      .error,
+      .tag.error {
+        color: #f87171;
+      }
+      .notice {
+        margin: 0 0 4px;
+        white-space: pre-wrap;
+        font-size: 12px;
+      }
+      .notice:empty {
+        display: none;
+      }
+      input.invalid {
+        outline: 2px solid #f87171;
+      }
+      .image-details canvas {
+        display: block;
+        margin: 6px 0;
+        max-width: 100%;
+        background: repeating-conic-gradient(#333 0 25%, #222 0 50%) 0 0 / 16px 16px;
+      }
+      .clip {
+        display: grid;
+        grid-template-columns: 1fr 1fr 44px auto auto;
+        gap: 4px;
+        align-items: center;
+        margin: 3px 0;
+      }
+      .clip input {
+        min-width: 0;
+      }
+      .frame-size {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .frame-size input {
+        width: 56px;
+      }
+      #view {
+        grid-area: view;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+      #inspector {
+        grid-area: inspector;
+        overflow: auto;
+        padding: 8px;
+        background: #18181b;
+      }
+      canvas {
+        background: #222;
+        max-width: 100%;
+        max-height: 100%;
+        touch-action: none;
+      }
+      ul {
+        list-style: none;
+        margin: 8px 0;
+        padding: 0;
+      }
+      li {
+        padding: 4px 6px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      li:hover {
+        background: #27272a;
+      }
+      li.selected {
+        background: #2563eb;
+      }
+      .status.error {
+        color: #f87171;
+      }
+      .status.muted {
+        color: #a1a1aa;
+      }
+      .migration {
+        grid-area: migration;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        padding: 6px 12px;
+        background: #292524;
+        border-bottom: 1px solid #854d0e;
+        color: #fde68a;
+        font-size: 12px;
+      }
+      .migration:empty {
+        display: none;
+      }
+      section.component {
+        border-top: 1px solid #333;
+        padding: 6px 0;
+      }
+      section.component h3 {
+        display: flex;
+        justify-content: space-between;
+        margin: 4px 0;
+        font-size: 13px;
+      }
+      label.row {
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        gap: 6px;
+        align-items: center;
+        margin: 3px 0;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+      }
+      input[type="text"],
+      input[type="number"],
+      select {
+        min-width: 0;
+      }
+      .color {
+        display: flex;
+        gap: 4px;
+      }
+      .color {
+        min-width: 0;
+      }
+      .color input[type="text"] {
+        flex: 1;
+        width: 0;
+      }
+      .color input[type="color"] {
+        flex: none;
+        width: 32px;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header id="projects"></header>
+    <header id="topbar"></header>
+    <p id="migration" class="migration"></p>
+    <aside id="sidebar">
+      <p id="notice" class="error notice"></p>
+      <div id="entities"></div>
+      <div id="images"></div>
+    </aside>
+    <main id="view"><canvas id="viewport"></canvas></main>
+    <aside id="inspector"></aside>
+    <script type="module" src="/src/editor/main.ts"></script>
+  </body>
+</html>

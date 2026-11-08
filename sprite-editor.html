@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sprite Editor</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font: 13px system-ui, sans-serif;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #111;
+        color: #e5e7eb;
+      }
+      body {
+        display: grid;
+        grid-template:
+          "top top top" auto
+          "tools view animation" 1fr
+          "tools frames animation" auto / 200px 1fr 280px;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+      }
+      #topbar {
+        grid-area: top;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: #18181b;
+        border-bottom: 1px solid #333;
+      }
+      #topbar label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      #topbar input[type="number"] {
+        width: 56px;
+      }
+      #topbar input[type="text"] {
+        width: 140px;
+      }
+      .status {
+        color: #a1a1aa;
+      }
+      .project {
+        color: #a1a1aa;
+      }
+      .project:empty {
+        display: none;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .ask {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 6px;
+        border: 1px solid #854d0e;
+        border-radius: 3px;
+        background: #292524;
+      }
+      .ask .question {
+        color: #fbbf24;
+      }
+      .status.error {
+        color: #f87171;
+      }
+      .status.saved {
+        color: #4ade80;
+      }
+      #tools {
+        grid-area: tools;
+        overflow: auto;
+        padding: 8px;
+        background: #18181b;
+        border-right: 1px solid #333;
+      }
+      #animation {
+        grid-area: animation;
+        overflow: auto;
+        padding: 8px;
+        background: #18181b;
+        border-left: 1px solid #333;
+      }
+      #tools h2,
+      #animation h2 {
+        margin: 8px 0 4px;
+        font-size: 12px;
+        text-transform: uppercase;
+        color: #a1a1aa;
+      }
+      #tools h2:first-child,
+      #animation h2:first-child {
+        margin-top: 0;
+      }
+      #frames {
+        grid-area: frames;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #18181b;
+        border-top: 1px solid #333;
+        min-width: 0;
+      }
+      .frame-controls {
+        display: flex;
+        flex: none;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        max-width: 200px;
+      }
+      .frame-label {
+        color: #a1a1aa;
+        white-space: nowrap;
+      }
+      .frame-list {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 4px 2px;
+        min-width: 0;
+      }
+      .frame {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        padding: 3px;
+        border: 2px solid #3f3f46;
+        border-radius: 3px;
+        font-size: 11px;
+        color: #a1a1aa;
+        cursor: pointer;
+      }
+      .frame:hover {
+        border-color: #52525b;
+      }
+      .frame.selected {
+        border-color: #2563eb;
+        color: #e5e7eb;
+      }
+      .frame canvas,
+      .preview {
+        background: repeating-conic-gradient(#3a3a3a 0 25%, #2a2a2a 0 50%) 0 0 / 8px 8px;
+        image-rendering: pixelated;
+      }
+      .preview {
+        display: block;
+        margin: 0 auto 6px;
+        max-width: 100%;
+      }
+      #animation select,
+      #animation input[type="number"] {
+        min-width: 0;
+      }
+      #animation input[type="number"] {
+        width: 48px;
+      }
+      .clip {
+        display: grid;
+        grid-template-columns: 1fr 1fr 44px auto auto;
+        gap: 4px;
+        align-items: center;
+        margin: 3px 0;
+      }
+      .clip input {
+        min-width: 0;
+      }
+      input.invalid {
+        outline: 2px solid #f87171;
+      }
+      .tool-list {
+        display: grid;
+        gap: 4px;
+      }
+      .tool-list button {
+        text-align: left;
+        padding: 5px 8px;
+        border: 1px solid #3f3f46;
+        border-radius: 3px;
+        background: #27272a;
+        color: inherit;
+        cursor: pointer;
+      }
+      .tool-list button:hover {
+        background: #3f3f46;
+      }
+      .tool-list button[aria-pressed="true"] {
+        background: #2563eb;
+        border-color: #2563eb;
+      }
+      .tool-list button kbd {
+        float: right;
+        color: #a1a1aa;
+        font: 11px monospace;
+      }
+      .brush-size {
+        display: grid;
+        grid-template-columns: 1fr 28px;
+        gap: 6px;
+        align-items: center;
+      }
+      .brush-size input {
+        min-width: 0;
+      }
+      .current-color {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+      .current-color input[type="color"] {
+        width: 40px;
+        height: 28px;
+        padding: 0;
+        border: 1px solid #3f3f46;
+        background: none;
+        cursor: pointer;
+      }
+      .palette {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 4px;
+      }
+      .paint-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 3px 0;
+      }
+      .paint-row label {
+        width: 64px;
+        white-space: nowrap;
+      }
+      .paint-row input[type="color"] {
+        width: 36px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid #3f3f46;
+        background: none;
+        cursor: pointer;
+      }
+      .paint-row input[type="number"] {
+        width: 48px;
+      }
+      .palette-target {
+        display: flex;
+        gap: 8px;
+        margin: 6px 0 4px;
+        color: #a1a1aa;
+        font-size: 12px;
+      }
+      .palette-target label {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .palette button {
+        aspect-ratio: 1;
+        padding: 0;
+        border: 2px solid #3f3f46;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      .palette button[aria-pressed="true"] {
+        border-color: #fff;
+        outline: 1px solid #000;
+      }
+      .edit-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .hint {
+        margin: 8px 0 0;
+        color: #71717a;
+        font-size: 11px;
+        line-height: 1.4;
+      }
+      #view {
+        grid-area: view;
+        display: grid;
+        place-items: center;
+        overflow: auto;
+        min-width: 0;
+        min-height: 0;
+        padding: 16px;
+        box-sizing: border-box;
+      }
+      #sprite {
+        /* Transparent pixels show as a checkerboard. */
+        background: repeating-conic-gradient(#3a3a3a 0 25%, #2a2a2a 0 50%) 0 0 / 16px 16px;
+        image-rendering: pixelated;
+        touch-action: none;
+        cursor: crosshair;
+        box-shadow: 0 0 0 1px #52525b;
+      }
+    </style>
+  </head>
+  <body>
+    <header id="topbar"></header>
+    <aside id="tools"></aside>
+    <main id="view"><canvas id="sprite"></canvas></main>
+    <footer id="frames"></footer>
+    <aside id="animation"></aside>
+    <script type="module" src="/src/sprite-editor/main.ts"></script>
+  </body>
+</html>

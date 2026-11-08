@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Code Editor</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font: 13px system-ui, sans-serif;
+        --mono: ui-monospace, "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
+        /* The code's color scheme (One Dark-like), tuned for contrast on the #111 editor. */
+        --code-bg: #111;
+        --code-text: #dcdfe4;
+        --code-caret: #f4f4f5;
+        --code-selection: rgba(59, 130, 246, 0.4);
+        --code-current-line: #1b1d23;
+        --tok-comment: #8b919c;
+        --tok-string: #98c379;
+        --tok-number: #d19a66;
+        --tok-literal: #d19a66;
+        --tok-keyword: #c678dd;
+        --tok-regexp: #56b6c2;
+        --tok-function: #61afef;
+        --tok-type: #e5c07b;
+        --tok-property: #e06c75;
+        --tok-operator: #56b6c2;
+        --tok-punctuation: #abb2bf;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #111;
+        color: #e5e7eb;
+      }
+      body {
+        display: grid;
+        grid-template:
+          "top top top" auto
+          "nav editor side" 1fr / 240px 1fr 320px;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      button.danger {
+        color: #fca5a5;
+      }
+      #topbar {
+        grid-area: top;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: #18181b;
+        border-bottom: 1px solid #333;
+      }
+      .status {
+        color: #a1a1aa;
+      }
+      .status.error {
+        color: #f87171;
+      }
+      .status.unsaved {
+        color: #fbbf24;
+      }
+      .muted {
+        color: #a1a1aa;
+      }
+      .project {
+        color: #a1a1aa;
+      }
+      .project:empty {
+        display: none;
+      }
+      #navigator {
+        grid-area: nav;
+        overflow: auto;
+        padding: 8px;
+        background: #18181b;
+        border-right: 1px solid #333;
+      }
+      #navigator h2,
+      #side h2 {
+        margin: 8px 0 4px;
+        font-size: 12px;
+        text-transform: uppercase;
+        color: #a1a1aa;
+      }
+      #side h2 {
+        text-transform: none;
+        font: 13px var(--mono);
+        color: #e5e7eb;
+      }
+      #side h3 {
+        margin: 12px 0 4px;
+        font-size: 12px;
+        text-transform: uppercase;
+        color: #a1a1aa;
+      }
+      #navigator h2:first-of-type {
+        margin-top: 0;
+      }
+      #navigator h3 {
+        margin: 2px 0;
+        font-size: 11px;
+        text-transform: uppercase;
+      }
+      ul.disabled li {
+        color: #a1a1aa;
+      }
+      ul {
+        list-style: none;
+        margin: 6px 0 10px;
+        padding: 0;
+      }
+      li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 6px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      li:hover {
+        background: #27272a;
+      }
+      li.selected {
+        background: #2563eb;
+      }
+      li.empty {
+        color: #71717a;
+        cursor: default;
+      }
+      .tag {
+        padding: 0 4px;
+        border-radius: 3px;
+        background: #3f3f46;
+        font-size: 11px;
+      }
+      .tag.unsaved {
+        background: #854d0e;
+      }
+      .tag.error {
+        background: #7f1d1d;
+        color: #fecaca;
+      }
+      .scenes {
+        margin-left: auto;
+        color: #a1a1aa;
+        font-size: 11px;
+      }
+      li.selected .scenes,
+      li.selected .tag {
+        color: #e5e7eb;
+      }
+      .add-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin: 2px 0;
+      }
+      .add-form input {
+        flex: 1;
+        min-width: 0;
+      }
+      .add-form select {
+        flex-basis: 100%;
+        min-width: 0;
+      }
+      .add-form .error {
+        flex-basis: 100%;
+        font-size: 12px;
+      }
+      .add-form .error:empty {
+        display: none;
+      }
+      .confirming {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+      }
+      .confirming .question {
+        color: #fbbf24;
+      }
+      .migration {
+        grid-area: top;
+        align-self: end;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin: 0;
+        padding: 6px 12px;
+        background: #292524;
+        border-bottom: 1px solid #854d0e;
+        color: #fde68a;
+        font-size: 12px;
+      }
+      .migration:empty {
+        display: none;
+      }
+      .note {
+        margin: 0 0 6px;
+        white-space: pre-wrap;
+        font-size: 12px;
+      }
+      .note:empty {
+        display: none;
+      }
+      .error {
+        color: #f87171;
+      }
+      #editor {
+        grid-area: editor;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+      }
+      .editor-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 12px;
+        background: #1c1c1f;
+        border-bottom: 1px solid #333;
+        font: 12px var(--mono);
+      }
+      .editor-header .state {
+        color: #fbbf24;
+      }
+      .editor-body {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+      /* The gutter, the colored copy and the textarea must share these exactly. */
+      .gutter,
+      .highlight,
+      .code {
+        margin: 0;
+        padding: 8px 0;
+        border: 0;
+        font: 13px/20px var(--mono);
+        /* Same shaping in both layers, whatever coding font is installed. */
+        font-variant-ligatures: none;
+        letter-spacing: normal;
+        tab-size: 2;
+        white-space: pre;
+      }
+      .gutter {
+        flex: none;
+        width: 40px;
+        overflow: hidden;
+        /* Extra room at the end, so it can scroll as far as the textarea (which has scrollbars). */
+        padding-bottom: 40px;
+        padding-right: 8px;
+        text-align: right;
+        color: #52525b;
+        background: #151517;
+        border-right: 1px solid #27272a;
+        user-select: none;
+      }
+      .code-stack {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        background: var(--code-bg);
+      }
+      .current-line,
+      .highlight,
+      .code {
+        position: absolute;
+        left: 0;
+        right: 0;
+      }
+      .current-line {
+        background: var(--code-current-line);
+        pointer-events: none;
+      }
+      .code-stack:not(:focus-within) .current-line {
+        background: transparent;
+      }
+      .highlight,
+      .code {
+        top: 0;
+        bottom: 0;
+        padding-left: 10px;
+      }
+      .highlight {
+        overflow: hidden;
+        padding-right: 40px;
+        padding-bottom: 40px;
+        color: var(--code-text);
+        pointer-events: none;
+      }
+      .code {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        overflow: auto;
+        outline: none;
+        resize: none;
+        background: transparent;
+        /* The letters show through from the colored copy underneath. */
+        color: transparent;
+        caret-color: var(--code-caret);
+        -webkit-text-fill-color: transparent;
+      }
+      .code::selection {
+        background: var(--code-selection);
+      }
+      .tok-comment {
+        color: var(--tok-comment);
+        font-style: italic;
+      }
+      .tok-string {
+        color: var(--tok-string);
+      }
+      .tok-number {
+        color: var(--tok-number);
+      }
+      .tok-literal {
+        color: var(--tok-literal);
+      }
+      .tok-keyword {
+        color: var(--tok-keyword);
+      }
+      .tok-regexp {
+        color: var(--tok-regexp);
+      }
+      .tok-function {
+        color: var(--tok-function);
+      }
+      .tok-type {
+        color: var(--tok-type);
+      }
+      .tok-property {
+        color: var(--tok-property);
+      }
+      .tok-operator {
+        color: var(--tok-operator);
+      }
+      .tok-punctuation {
+        color: var(--tok-punctuation);
+      }
+      .placeholder {
+        margin: auto;
+        color: #71717a;
+      }
+      .suggest {
+        position: absolute;
+        z-index: 2;
+        margin: 0;
+        padding: 2px 0;
+        list-style: none;
+        min-width: 200px;
+        max-width: 380px;
+        max-height: 224px;
+        overflow: auto;
+        background: #27272a;
+        border: 1px solid #3f3f46;
+        border-radius: 3px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        font: 12px/1.7 var(--mono);
+      }
+      .suggest li {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 8px;
+        border-radius: 0;
+      }
+      .suggest li.selected {
+        background: #2563eb;
+      }
+      .suggest .kind {
+        flex: none;
+        color: #a1a1aa;
+        font-size: 11px;
+      }
+      .suggest li.selected .kind {
+        color: #dbeafe;
+      }
+      #side {
+        grid-area: side;
+        overflow: auto;
+        padding: 8px 10px;
+        background: #18181b;
+        border-left: 1px solid #333;
+      }
+      #details {
+        padding-bottom: 8px;
+        border-bottom: 1px solid #333;
+      }
+      #details:empty {
+        display: none;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin: 6px 0;
+      }
+      .check {
+        margin: 0;
+        padding: 6px 8px;
+        border-radius: 3px;
+        background: #111;
+        font: 12px/1.4 var(--mono);
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #a1a1aa;
+      }
+      .check.ok {
+        color: #4ade80;
+      }
+      .check.error {
+        color: #fca5a5;
+      }
+      #help details {
+        margin: 4px 0;
+      }
+      #help summary {
+        cursor: pointer;
+        color: #d4d4d8;
+      }
+      #help p {
+        margin: 6px 0;
+        color: #a1a1aa;
+        line-height: 1.4;
+      }
+      #help .sample {
+        margin: 6px 0;
+        padding: 6px 8px;
+        overflow: auto;
+        border-radius: 3px;
+        background: var(--code-bg);
+        font: 11.5px/1.4 var(--mono);
+        color: var(--code-text);
+      }
+      #help .names {
+        font: 11.5px/1.5 var(--mono);
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <header id="topbar"></header>
+    <aside id="navigator"></aside>
+    <p id="migration" class="migration"></p>
+    <main id="editor"></main>
+    <aside id="side">
+      <div id="details"></div>
+      <div id="help"></div>
+    </aside>
+    <script type="module" src="/src/code-editor/main.ts"></script>
+  </body>
+</html>

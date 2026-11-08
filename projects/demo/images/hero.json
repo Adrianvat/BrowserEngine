@@ -1,0 +1,8 @@
+{
+  "frameWidth": 16,
+  "frameHeight": 16,
+  "animations": {
+    "idle": { "frames": [0, 1], "fps": 2 },
+    "walk": { "frames": [2, 3, 4, 5], "fps": 8 }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "systems": [
+    "playerInput",
+    "kick",
+    "physics",
+    "popToys",
+    "playerAppearance",
+    "backToTitle",
+    "startOnEnter"
+  ]
+}
